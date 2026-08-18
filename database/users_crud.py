@@ -3,8 +3,10 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import select, Result, update
+from sqlalchemy.exc import ProgrammingError, NoSuchTableError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from database.connection import connection
 from models import User
 from services.EnumRoles import Roles
@@ -67,9 +69,17 @@ async def update_last_visit(session: AsyncSession, uuid: str | int):
 
 @connection
 async def get_users_by_role(session: AsyncSession, role: Roles | None = Roles.ADMIN.name) -> list[str]:
-    stmt = (
-        select(User.uuid).where(User.role == role)
-    )
-    result = await session.execute(stmt)
-    uuids: list = list(result.scalars().all())
-    return uuids
+    try:
+        stmt = (
+            select(User.uuid).where(User.role == role)
+        )
+        result = await session.execute(stmt)
+        uuids: list = list(result.scalars().all())
+        return uuids
+    except (ProgrammingError, NoSuchTableError) as e:
+        logger.error(f"Таблица не найдена: {e}")
+        return settings.ADMINS.append(settings.MAIN_ADMIN)
+    except Exception as e:
+        logger.error(f"Другая ошибка: {e}")
+        return settings.ADMINS.append(settings.MAIN_ADMIN)
+

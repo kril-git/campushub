@@ -41,7 +41,7 @@ class DatabaseHelper:
     иначе к локальному.
     """
     def __init__(self):
-        if settings.VPS:
+        if settings.USE_TUNNEL:
             self.engine = create_async_engine(
                 url=settings.database_url_vds_server,
                 echo=settings.DB_ECHO,

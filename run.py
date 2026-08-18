@@ -42,6 +42,7 @@ async def main():
     dp['my_int_var'] = some_var_1
     dp['my_text_var'] = some_var_2
     settings.ADMINS = await get_users_by_role(role=Roles.ADMIN.name)  # type: ignore
+
     dp["admins"] = settings.ADMINS
     await dp.start_polling(bot)
 

@@ -30,7 +30,7 @@ def connection(method):
     """
 
     async def wrapper(*args, **kwargs):
-        if settings.VPS:
+        if settings.USE_TUNNEL:
                 server = SSHTunnelForwarder(
                         ssh_address_or_host=(settings.DB_HOST_VDS, settings.SSH_INT_PORT),
                         ssh_username=settings.SSH_USERNAME,

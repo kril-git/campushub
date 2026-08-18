@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PG_PORT: int
     SSH_INT_PORT: int
 
-    VPS: bool
+    # VPS: bool
     USE_TUNNEL: bool
 
     # Подключение к удаленной БД
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     #
     @property
     def DATABASE_URL(self):
-        if self.VPS:
+        if self.USE_TUNNEL:
             return (
                 f"{self.DB_TYPE}+asyncpg://{self.DB_USER_VDS}:{self.DB_PASS_VDS}"
                 f"@{self.LOCALHOST}:{self.DB_PORT}/{self.DB_NAME}"
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     @property
     def get_redis_url(self) -> str:
-        if self.VPS:
+        if self.USE_TUNNEL:
             return f"localhost"
         else:
             return f"{self.DB_HOST}"
