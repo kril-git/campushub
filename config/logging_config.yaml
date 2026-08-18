@@ -1,0 +1,62 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+ # Цветной форматтер (для консоли)
+  colored:
+    '()': config.logger_config.ColoredFormatter  # <-- ВАЖНО: ключ '()' и путь к классу
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  standard:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  detailed:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s - [%(filename)s:%(lineno)d]'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: colored
+    stream: ext://sys.stdout
+
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/app.log
+    maxBytes: 10485760  # 10MB 10485760
+    backupCount: 5
+    encoding: utf8
+#    delay: true
+
+  debug_file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG  # все сообщения
+    formatter: detailed
+    filename: logs/debug.log
+    maxBytes: 10485760
+    backupCount: 5
+    encoding: utf8
+
+  error_file:
+    class: logging.handlers.RotatingFileHandler
+    level: ERROR
+    formatter: detailed
+    filename: logs/error.log
+    maxBytes: 10485760  # 10MB 10485760
+    backupCount: 5
+    encoding: utf8
+#    delay: true
+
+#loggers:
+#  ceo_helper:
+#    level: DEBUG
+#    handlers: [console, file, error_file, debug_file]
+#    propagate: false
+#    qualname: ceo_helper
+
+root:
+  level: DEBUG
+  handlers: [console, file, debug_file, error_file]

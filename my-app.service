@@ -1,0 +1,19 @@
+# nano /lib/systemd/system/my-app.service
+# systemctl enable my-app
+# systemctl start my-app
+
+[Unit]
+Description=Helper online bot
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/python_prj/helper/.venv/bin/python3 run.py
+ExecReload=/python_prj/helper/.venv/bin/python3 run.py
+WorkingDirectory=/python_prj/helper/
+KillMode=process
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
