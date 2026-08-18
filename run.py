@@ -44,7 +44,23 @@ async def main():
     settings.ADMINS = await get_users_by_role(role=Roles.ADMIN.name)  # type: ignore
 
     dp["admins"] = settings.ADMINS
-    await dp.start_polling(bot)
+    # await dp.start_polling(bot)
+    # Настройка graceful shutdown
+    try:
+        await dp.start_polling(
+            bot,
+            # Автоматическая обработка сигналов
+            handle_signals=True,
+            # Таймаут для завершения
+            polling_timeout=30
+        )
+    except KeyboardInterrupt:
+        logging.info("🛑 Бот остановлен пользователем")
+    except Exception as e:
+        logging.error(f"❌ Ошибка: {e}")
+    finally:
+        await bot.session.close()
+        logging.info("✅ Сессия закрыта")
 
 
 if __name__ == "__main__":
