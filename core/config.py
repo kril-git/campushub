@@ -2,7 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
     ALCHEMY_ECHO: bool
     ALCHEMY_POOL_SIZE: int
     ALCHEMY_MAX_OVERFLOW: int
@@ -54,10 +53,6 @@ class Settings(BaseSettings):
 
     PASSWORDS: str | None
 
-    # @property
-    # def DATABASE_URL(self):
-    #     return f"{self.DB_TYPE}+asyncpg://{self.DB_USER}:{self.DB_PASS}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-    #
     @property
     def DATABASE_URL(self):
         if self.USE_TUNNEL:
@@ -69,7 +64,7 @@ class Settings(BaseSettings):
             return (
                 f"{self.DB_TYPE}+asyncpg://{self.DB_USER}:{self.DB_PASS}"
                 f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-                )
+            )
 
     @property
     def get_redis_url(self) -> str:
@@ -77,10 +72,6 @@ class Settings(BaseSettings):
             return f"localhost"
         else:
             return f"{self.DB_HOST}"
-
-    @property
-    def database_url_vds_server(self):
-        return f"{self.DB_TYPE}+asyncpg://{self.DB_USER_VDS}:{self.DB_PASS_VDS}@{self.LOCALHOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     # case_sensitive=True -> должен совпадать регистр букв
     model_config = SettingsConfigDict(

@@ -5,10 +5,10 @@ from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
 
 from config import settings
 from infrastructure.tunnelmanager import TunnelManager
-from database.helper import db_helper
+# from database.helper import db_helper
 import logging
 
-from database.db_helper import DatabaseHelper
+from database.db_helper import DatabaseHelper, db_helper
 
 logger = logging.getLogger(__name__)
 

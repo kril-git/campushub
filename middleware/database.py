@@ -1,25 +1,8 @@
 import logging
-from typing import Callable, Any, Awaitable
-
-import paramiko
-from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, User
-
-from config import settings
-# from database.connection import init_tunnel
-from services.ssh_service import SSH
-
-logger = logging.getLogger(__name__)
-
-# middlewares.py
-import asyncssh
 import asyncpg
+import asyncssh
 from aiogram import BaseMiddleware
-from typing import Callable, Dict, Any, Awaitable
-import logging
-
 from core.dependencies import AppDependencies
-from database.helper import db_helper
 
 logger = logging.getLogger(__name__)
 

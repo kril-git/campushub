@@ -44,7 +44,6 @@ async def main():
     settings.ADMINS = await get_users_by_role(role=Roles.ADMIN.name)  # type: ignore
 
     dp["admins"] = settings.ADMINS
-    # await dp.start_polling(bot)
     # Настройка graceful shutdown
     try:
         await dp.start_polling(
@@ -67,5 +66,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Exit")
         logger.error(f"Что-то не так")
