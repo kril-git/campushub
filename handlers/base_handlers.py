@@ -55,7 +55,6 @@ async def get_main_helpers(message: Message):
     await message.answer(await create_str_from_dict(data=LEXICON_MAIN["RU"]))
 
 
-# @router.message(Command(commands="help"), IsAdmin(), NoneStates())
 @router.message(Command(commands="help"), IsAdmin(), StateFilter(None))
 async def get_help(message: Message):
     locale_help: dict = await get_help_admin(message=message)

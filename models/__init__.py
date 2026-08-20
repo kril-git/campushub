@@ -5,9 +5,8 @@ from .answers import Answer
 
 __all__ = ("User",
            "Base",
-           "Pool",
-           "PoolQuestion",
            "PoolAnswer",
-           "Answer",
-           "UserPool",
+           "PoolQuestion",
+           "Pool",
+           "UserPool"
            )
