@@ -4,9 +4,26 @@ import logging
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError
 from aiogram.types import Message
 
+from database.users_crud import get_user_by_uuid
+from lexicon.lexicon import LEXICON_USER_HELP
 from models import User
 
 logger = logging.getLogger(__name__)
+
+
+# рабочий
+async def get_help_user(message: Message) -> dict:
+    """ Пока бот говорит только по-русски """
+    locale = message.from_user.language_code
+    if locale is None or "":
+        locale = "ru"
+    locale = "ru"
+    from lexicon.lexicon import LEXICON_USER_HELP
+    data = LEXICON_USER_HELP[locale.upper()]
+    user: User = await get_user_by_uuid(uuid=message.from_user.id)  # type: ignore
+    if not user.registration:
+        data.update({"/registration": "Пройти регистрацию"})
+    return data
 
 
 async def send_dict(message: Message, data: dict):

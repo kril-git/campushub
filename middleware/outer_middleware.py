@@ -30,7 +30,8 @@ class СheckingRoleUser(BaseMiddleware):
         tunnel = AppDependencies.tunnel_manager
         # print(database.ssl_connect_kwargs)
         # print("Все ключи в ssl_connect_kwargs:", database.ssl_connect_kwargs.keys())
-        await tunnel.connect_ssh()
+        if settings.USE_TUNNEL:
+            await tunnel.connect_ssh()
 
 
 

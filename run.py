@@ -23,7 +23,8 @@ async def main():
     setup_logging()
 
     # 1. Инициализируем зависимости (один раз)
-    await AppDependencies.initialize()
+    if settings.USE_TUNNEL:
+        await AppDependencies.initialize()
     dp = Dispatcher(
         storage=AppDependencies.storage,
         events_isolation=SimpleEventIsolation(),
@@ -45,6 +46,7 @@ async def main():
 
     dp["admins"] = settings.ADMINS
     # Настройка graceful shutdown
+    print(f"ADMINS: {settings.ADMINS}")
     try:
         await dp.start_polling(
             bot,

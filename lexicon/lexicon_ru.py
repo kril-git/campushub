@@ -1,14 +1,10 @@
 LEXICON_MENU_USER_CAMPUSHUB: dict[str, str] = {
     "/start": "запустить сеанс.",
-    # "/accounting": "управленческий учет",
     "/help": "получить список команд."
 }
 
 LEXICON_MENU_ADMIN_CAMPUSHUB: dict[str, str] = {
     "/start": "запустить сеанс.",
-    # "/accounting": "управленческий учет",
-    # "/settings": "настройки",
-    # "/main": "меню помощника",
     "/help": "получить список команд администратора."
 }
 

@@ -8,21 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from database.connection import connection
-from models import User
+from models import User, PersonalRecordCard
 from services.EnumRoles import Roles
 
 logger = logging.getLogger(__name__)
 
 
 @connection
-# async def if_exist_user(uuid: str | int, session: Optional[AsyncSession] = None) -> bool:
-async def if_exist_user(session: Optional[AsyncSession], uuid: str | int) -> bool:
+async def if_exist_user(session: Optional[AsyncSession], uuid: str | int) -> bool | None:
     """
     :param session:
     :param uuid: уникальный номер пользователя
     :return: true or false
     """
-
+    if session is None:
+        return None
     if isinstance(uuid, int):
         stmt = select(User).where(User.uuid == str(uuid))
     else:
@@ -83,3 +83,41 @@ async def get_users_by_role(session: AsyncSession, role: Roles | None = Roles.AD
         logger.error(f"Другая ошибка: {e}")
         return settings.ADMINS.append(settings.MAIN_ADMIN)
 
+
+@connection
+async def save_user_registration(session: AsyncSession, user_data: dict, uuid: str) -> PersonalRecordCard:
+    """
+    Сохраняет данные регистрации пользователя
+    """
+    try:
+        # ✅ Добавляем uuid в данные
+        user_data["uuid"] = uuid
+        birth_date_str = user_data["birth_date"]
+        date_obj = datetime.strptime(birth_date_str, "%d.%m.%Y").date()
+        user_data["birth_date"] = date_obj
+
+        # ✅ Логируем данные для отладки
+        logger.info(f"Сохранение данных пользователя {uuid}:")
+        # for key, value in user_data.items():
+        #     logger.info(f"  {key}: {value}")
+
+        # ✅ СОЗДАЕМ И ПРИСВАИВАЕМ объект
+        registration_field = PersonalRecordCard(**user_data)
+
+        # ✅ Проверяем, что объект создан
+        if registration_field is None:
+            logger.error("❌ Не удалось создать PersonalRecordCard")
+            return None
+
+        # ✅ Добавляем в сессию
+        session.add(registration_field)
+        await session.commit()
+        await session.refresh(registration_field)
+
+        logger.info(f"✅ Данные пользователя {uuid} сохранены")
+        return registration_field
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при сохранении данных пользователя {uuid}: {e}")
+        await session.rollback()
+        return None

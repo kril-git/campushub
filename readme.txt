@@ -53,8 +53,24 @@
         alembic upgrade head
 
     Если мы работаем через туннель то запускаем туннель из командной строки
-        ssh -L 0.0.0.0:5432:localhost:5432 postgres@155.212.171.8 -K /Users/kril/.ssh/ed25519_vds_postgres
+        # ssh -L 0.0.0.0:5432:localhost:5432 postgres@155.212.171.8 -K /Users/kril/.ssh/id_ed25519_campushub
+        ssh -L 0.0.0.0:5432:localhost:5432 -i /Users/kril/.ssh/id_ed25519_campushub postgres@155.212.171.8
         ssh -L [REMOTE_IP:]REMOTE_PORT:DESTINATION:DESTINATION_PORT [USER@]SSH_SERVER
+
+
+    Если мы работаем через туннель то запускаем туннель из командной строки
+        # ssh -L 0.0.0.0:5432:localhost:5432 postgres@62.169.26.93 -K /Users/kril/.ssh/ed25519_campushub
+        ssh -L 0.0.0.0:5432:localhost:5432 -i /Users/kril/.ssh/ed25519_campushub kril@62.169.26.93
+        ssh -L [REMOTE_IP:]REMOTE_PORT:DESTINATION:DESTINATION_PORT [USER@]SSH_SERVER
+
+
+8. Postgres
+
+    Конфигурационные файлы
+        sudo nano /etc/postgresql/*/main/pg_hba.conf
+        sudo nano /etc/postgresql/*/main/postgresql.conf
+        Если статус не active (running), запустите её командой sudo systemctl start postgresql
+        и добавьте в автозагрузку: sudo systemctl enable postgresql
 
 logs
 

@@ -5,7 +5,8 @@ from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError
 from aiogram.types import Message
 
 from config import settings
-from models import User, UserPool
+# from models import User, UserPool
+from models import User
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +28,13 @@ async def _is_admin(uuid: int | str) -> bool:
             return False
 
 
+# рабочий
 async def get_help_admin(message: Message) -> dict:
+    """ Пока бот говорит только по-русски """
     locale = message.from_user.language_code
     if locale is None or "":
         locale = "ru"
+    locale = "ru"
     from lexicon.lexicon import LEXICON_ADMIN_HELP
     data = LEXICON_ADMIN_HELP[locale.upper()]
     return data
@@ -66,19 +70,21 @@ async def send_users_list(message: Message, users: list[User]) -> int:
     return count - 1
 
 
+# рабочий
 async def send_users_list_4096(message: Message, users: list[User]) -> int:
     count: int = 1
     string_users: list[str] = []
     strings_list: list[str] = []
     for user in users:
-        if len(f"{count}, {user.uuid}, {user.first_name}, {user.role}\n") + len("".join(string_users)) < 4096:
-            string_users.append(f"{count}, {user.uuid}, {user.first_name}, {user.role}\n")
+        if len(f"{count}, {user.uuid}, {user.first_name}, {user.role.name}, {user.registration}\n") + len(
+                "".join(string_users)) < 4096:
+            string_users.append(f"{count}, {user.uuid}, {user.first_name}, {user.role.name}, {user.registration}\n")
             if len(users) == count:
                 strings_list.append("".join(string_users))
         else:
             strings_list.append("".join(string_users))
             string_users.clear()
-            string_users.append(f"{count}, {user.uuid}, {user.first_name}, {user.role}\n")
+            string_users.append(f"{count}, {user.uuid}, {user.first_name}, {user.role.name}, {user.registration}\n")
             if len(users) == count:
                 strings_list.append("".join(string_users))
         count += 1
@@ -98,5 +104,3 @@ async def send_users_list_4096(message: Message, users: list[User]) -> int:
 
     logger.info(f"{count - 1} messages successful sent.")
     return count - 1
-
-
