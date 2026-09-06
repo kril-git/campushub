@@ -85,7 +85,7 @@ async def get_users_by_role(session: AsyncSession, role: Roles | None = Roles.AD
 
 
 @connection
-async def save_user_registration(session: AsyncSession, user_data: dict, uuid: str) -> PersonalRecordCard:
+async def save_user_registration(session: AsyncSession, user_data: dict, uuid: str) -> PersonalRecordCard | None:
     """
     Сохраняет данные регистрации пользователя
     """
@@ -98,8 +98,6 @@ async def save_user_registration(session: AsyncSession, user_data: dict, uuid: s
 
         # ✅ Логируем данные для отладки
         logger.info(f"Сохранение данных пользователя {uuid}:")
-        # for key, value in user_data.items():
-        #     logger.info(f"  {key}: {value}")
 
         # ✅ СОЗДАЕМ И ПРИСВАИВАЕМ объект
         registration_field = PersonalRecordCard(**user_data)
@@ -111,6 +109,14 @@ async def save_user_registration(session: AsyncSession, user_data: dict, uuid: s
 
         # ✅ Добавляем в сессию
         session.add(registration_field)
+        # Вариант Б: Через update (если объект не загружен)
+        await session.execute(
+            update(User)
+            .where(User.uuid == uuid)
+            .values(
+                registration=True
+            )
+        )
         await session.commit()
         await session.refresh(registration_field)
 

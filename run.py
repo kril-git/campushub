@@ -46,7 +46,6 @@ async def main():
 
     dp["admins"] = settings.ADMINS
     # Настройка graceful shutdown
-    print(f"ADMINS: {settings.ADMINS}")
     try:
         await dp.start_polling(
             bot,

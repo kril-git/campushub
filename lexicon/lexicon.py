@@ -15,7 +15,15 @@ class LanguageTexts:
     term_time_address: str
     parents_info: str
     group: str
-
+    hello: str
+    one_enter: str
+    user_exist: str
+    status_family: str
+    children: str
+    low_income_family: str
+    disability: str
+    brsm: str
+    cas: str
 
 class Lexicon:
     # Использование:
@@ -29,29 +37,48 @@ class Lexicon:
         given_name="Введите ваше имя:",
         middle_name="Введите ваше отчество:",
         group="Введите номер группы:",
-        phone="📞 Введите ваш номер телефона в формате +7XXXXXXXXXX\nИли нажмите кнопку 'Отправить номер':",
+        phone="📞 Введите ваш номер телефона в формате +375XXXXXXXXXX\nИли нажмите кнопку 'Отправить номер':",
         email="📧 Введите ваш Email (или напишите 'нет'):",
         birth_date="Дата рождения:",
-        nationality="Ваша национальность:",
+        nationality="Ваше гражданство:",
         term_time_address="Введите адресс места проживания в период учебы:",
-        parents_info="Введите информацию о родителях .....",
+        parents_info="Введите информацию о родителях (ФИО, Место работы, Должность, Контактный номер телефона)",
+        hello="Привет {var}, рад тебя видеть 👋",
+        one_enter="Привет, друг 👋.\n Поздравляем тебя 🎉 - ты "
+                  "студент самого лучшего ВУЗа страны. Ну а "
+                  "теперь пришло время познакомиться. На кнопке меню нажми получить список команд ➡️  /registration и "
+                  "ответь на вопросы 🤔. У тебя это займет пару минут, но очень поможет"
+                  "нам для дальнейшей коммуникации и дружбы 🤝.",
+        user_exist="Если ты еще не прошел регистрацию, то перейди в меню ➡️ получить список команд ➡️ регистрация",
+        status_family="Укажите статус своей семьи условными обозначениями: пол - полная семья, Р -родители в разводе, "
+                      "П - потеря кормильца (одного из родителей), Б -воспитывает один из родителей, не состоящей в "
+                      "браке",
+        children="У тебя многодетная семья (3 и более детей до 18 лет) ? ответ в формате (да или нет)",
+        low_income_family="У тебя малообеспеченная семья ? ответ в формате (да или нет)",
+        disability="У тебя есть инвалидность ? ответ в формате (да или нет)",
+        brsm="Являешься членом ПО ООО БРСМ?  ответ в формате (да или нет)",
+        cas="Ты пострадавший от ЧАЭС ? ответ в формате (да или нет)",
     )
-    EN: LanguageTexts = LanguageTexts(
-        start="🎓 Welcome to the registration system!\n\n",
-        surname="Введите вашу Фамилию:",
-        given_name="Введите ваше имя:",
-        middle_name="Введите ваше отчество:",
-        group="Введите номер группы:",
-        phone="📞 Введите ваш номер телефона в формате +7XXXXXXXXXX\nИли нажмите кнопку 'Отправить номер':",
-        email="📧 Введите ваш Email (или напишите 'нет'):",
-        birth_date="Дата рождения:",
-        nationality="Ваша национальность:",
-        term_time_address="Введите адресс места проживания в период учебы:",
-        parents_info="Введите информацию о родителях .....",
-    )
+    # EN: LanguageTexts = LanguageTexts(
+    #     start="🎓 Welcome to the registration system!\n\n",
+    #     surname="Введите вашу Фамилию:",
+    #     given_name="Введите ваше имя:",
+    #     middle_name="Введите ваше отчество:",
+    #     group="Введите номер группы:",
+    #     phone="📞 Введите ваш номер телефона в формате +7XXXXXXXXXX\nИли нажмите кнопку 'Отправить номер':",
+    #     email="📧 Введите ваш Email (или напишите 'нет'):",
+    #     birth_date="Дата рождения:",
+    #     nationality="Ваша национальность:",
+    #     term_time_address="Введите адресс места проживания в период учебы:",
+    #     parents_info="Введите информацию о родителях .....",
+    #     hello='Hello {var}',
+    #     one_enter="",
+    #     user_exist="",
+    #     status_family="",
+    # )
 
     @classmethod
-    def get_text(cls, lang: str, key) -> str:
+    def get_text(cls, key: str, lang: str = "RU") -> str:
         """
                 Получить текст по языку и ключу
 
@@ -69,7 +96,13 @@ class Lexicon:
             # Если язык или ключ не найден - возвращаем текст на русском
             return getattr(cls.RU, key, f"❌ Текст '{key}' не найден")
 
-
+    @classmethod
+    def get_text_and_var(cls, key: str, lang: str = "RU", **kwargs) -> str:
+        try:
+            text = getattr(getattr(cls, lang.upper()), key)
+            return text.format(**kwargs)
+        except (AttributeError, KeyError):
+            return getattr(cls.RU, key, f"❌ Текст '{key}' не найден").format(**kwargs)
 
 
 LEXICON_ADMIN_HELP: dict[str, dict[str, str]] = {

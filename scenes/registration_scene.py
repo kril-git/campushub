@@ -18,6 +18,7 @@ from aiogram.types import (
 from keyboards.inline_keyboard import i_get_start_keyboard, i_get_cancel_keyboard, i_get_confirm_keyboard
 from keyboards.reply_keyboar import r_get_phone_keyboard
 from lexicon.constants import steps
+from lexicon.lexicon import Lexicon
 
 logger = logging.getLogger(__name__)
 router = Router(name=__name__)
@@ -210,9 +211,30 @@ class RegistrationScene(Scene, state="registration_scene"):
 
             case "parents_info":
                 await message.answer(
-                    "👨‍👩‍👦 Введите информацию о родителях (ФИО, контактный телефон):",
+                    text=Lexicon.get_text(lang="RU", key="parents_info"),
                     reply_markup=i_get_cancel_keyboard()
                 )
+            case "status_family":
+                await message.answer(text=Lexicon.get_text(lang="RU", key="status_family"),
+                                     reply_markup=i_get_cancel_keyboard()
+                                     )
+            case "children":
+                await message.answer(text=Lexicon.get_text(lang="RU", key="children"),
+                                     reply_markup=i_get_cancel_keyboard()
+                                     )
+            case "low_income_family":
+                await message.answer(text=Lexicon.get_text(lang="RU", key="low_income_family"),
+                                     reply_markup=i_get_cancel_keyboard()
+                                     )
+            case "disability":
+                await message.answer(text=Lexicon.get_text(lang="RU", key="disability"),
+                                     reply_markup=i_get_cancel_keyboard())
+            case "brsm":
+                await message.answer(text=Lexicon.get_text(lang="RU", key="brsm"),
+                                     reply_markup=i_get_cancel_keyboard())
+            case "cas":
+                await message.answer(text=Lexicon.get_text(lang="RU", key="cas"),
+                                     reply_markup=i_get_cancel_keyboard())
 
             case "confirm":
                 await message.answer(
@@ -408,6 +430,78 @@ class RegistrationScene(Scene, state="registration_scene"):
             case "parents_info":
                 user_data["parents_info"] = message.text.strip()
 
+            case "status_family":
+                user_data["status_family"] = message.text.strip()
+
+            case "children":
+                text = message.text.strip().upper()
+                if text.startswith("Д"):
+                    user_data["children"] = "ДА"
+                elif text.startswith("Н"):
+                    user_data["children"] = "НЕТ"
+                else:
+                    # user_data["children"] = ""
+                    await message.answer(
+                        "❌ Неверный формат, повторите снова,\nответ в формате (да или нет)",
+                        reply_markup=i_get_cancel_keyboard()
+                    )
+                    return
+            case "low_income_family":
+                text = message.text.strip().upper()
+                if text.startswith("Д"):
+                    user_data["low_income_family"] = "ДА"
+                elif text.startswith("Н"):
+                    user_data["low_income_family"] = "НЕТ"
+                else:
+                    # user_data["children"] = ""
+                    await message.answer(
+                        "❌ Неверный формат, повторите снова,\nответ в формате (да или нет)",
+                        reply_markup=i_get_cancel_keyboard()
+                    )
+                    return
+
+            case "disability":
+                text = message.text.strip().upper()
+                if text.startswith("Д"):
+                    user_data["disability"] = "ДА"
+                elif text.startswith("Н"):
+                    user_data["disability"] = "НЕТ"
+                else:
+                    # user_data["children"] = ""
+                    await message.answer(
+                        "❌ Неверный формат, повторите снова,\nответ в формате (да или нет)",
+                        reply_markup=i_get_cancel_keyboard()
+                    )
+                    return
+
+            case "brsm":
+                text = message.text.strip().upper()
+                if text.startswith("Д"):
+                    user_data["brsm"] = "ДА"
+                elif text.startswith("Н"):
+                    user_data["brsm"] = "НЕТ"
+                else:
+                    # user_data["children"] = ""
+                    await message.answer(
+                        "❌ Неверный формат, повторите снова,\nответ в формате (да или нет)",
+                        reply_markup=i_get_cancel_keyboard()
+                    )
+                    return
+
+            case "cas":
+                text = message.text.strip().upper()
+                if text.startswith("Д"):
+                    user_data["cas"] = "ДА"
+                elif text.startswith("Н"):
+                    user_data["cas"] = "НЕТ"
+                else:
+                    # user_data["children"] = ""
+                    await message.answer(
+                        "❌ Неверный формат, повторите снова,\nответ в формате (да или нет)",
+                        reply_markup=i_get_cancel_keyboard()
+                    )
+                    return
+
             case _:
                 await message.answer("⚠️ Неизвестный шаг.")
                 return
@@ -535,7 +629,6 @@ class RegistrationScene(Scene, state="registration_scene"):
                     reply_markup=None
                 )
                 await self.show_step(callback.message, state)
-
 
 # ============================================================
 # РЕГИСТРАЦИЯ КОМАНДЫ

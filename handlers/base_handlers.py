@@ -14,7 +14,7 @@ from filters.states_is_not_none import IsNotNoneStates
 # from keyboards.inline_keyboard import create_i_kb_from_dict
 # from keyboards.set_menu import set_main_menu
 from keyboards.set_menu import set_main_menu
-from lexicon.lexicon import LEXICON_MAIN
+from lexicon.lexicon import LEXICON_MAIN, Lexicon
 from lexicon.lexicon_ru import LEXICON_DIRECTORIES, LEXICON_DIRECTORIES_SCENE
 from models import User
 # from scenes.accounting_products import AccountingProductsScene
@@ -36,7 +36,7 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
 
     assert message.from_user is not None
     if not await if_exist_user(uuid=message.from_user.id):  # type: ignore
-        await message.answer(f'Привет друг! {message.from_user.id}', reply_markup=ReplyKeyboardRemove())
+        await message.answer(Lexicon.get_text(lang="RU", key="one_enter"), reply_markup=ReplyKeyboardRemove())
         user = User()
         user.uuid = str(message.from_user.id)
         user.first_name = message.from_user.first_name
@@ -51,7 +51,10 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
     else:
         # await set_main_menu_(bot=bot, message=message)
         await update_last_visit(uuid=message.from_user.id)  # type: ignore
-        await message.answer(text=f"Hello {message.from_user.first_name}", reply_markup=ReplyKeyboardRemove())
+        await message.answer(text=f"Привет, {message.from_user.first_name}. Рад тебя видеть.")
+        await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
+                             reply_markup=ReplyKeyboardRemove())
+        # await message.answer(text=f"Hello {message.from_user.first_name}", reply_markup=ReplyKeyboardRemove())
     await set_main_menu(bot=bot, uuid=message.from_user.id)
 
 
@@ -76,6 +79,7 @@ async def get_help(message: Message):
     for key, value in locale_help.items():
         data += f"{key} {value}\n"
     await message.answer(text=data)
+
 
 @router.message(Command(commands="test"), IsAdmin())
 async def test(message: Message):
