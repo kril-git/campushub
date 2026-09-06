@@ -87,6 +87,35 @@ class RegistrationScene(Scene, state="registration_scene"):
     # ============================================================
     # ОТОБРАЖЕНИЕ ШАГА (ЕДИНСТВЕННОЕ МЕСТО ОТПРАВКИ СООБЩЕНИЙ)
     # ============================================================
+    @classmethod
+    async def normalize_phone(cls, phone: str) -> str:
+        """
+        Приводит телефон к формату +375XXXXXXXXX
+
+        Поддерживает:
+        - +375296261405
+        - 375296261405
+        - 296261405
+        - +375 29 626-14-05
+        - 8 029 626-14-05
+        """
+        # Удаляем все пробелы, дефисы, скобки
+        phone = re.sub(r'[\s\-\(\)]', '', phone)
+
+        # Если начинается с 8 — заменяем на +375
+        if phone.startswith('8'):
+            phone = '+375' + phone[1:]
+
+        # Если начинается с 375 (без +) — добавляем +
+        if phone.startswith('375') and not phone.startswith('+'):
+            phone = '+' + phone
+
+        # Если только 9 цифр — добавляем +375
+        if re.match(r'^\d{9}$', phone):
+            phone = '+375' + phone
+
+        return phone
+
     async def process_phone_contact(self, message: Message, state: FSMContext):
         """Обработка контакта с телефоном"""
         data = await state.get_data()
@@ -198,10 +227,9 @@ class RegistrationScene(Scene, state="registration_scene"):
                 )
 
             case "nationality":
-                await message.answer(
-                    "🌍 Введите вашу национальность:",
-                    reply_markup=i_get_cancel_keyboard()
-                )
+                await message.answer(text=f"🌍 {Lexicon.get_text(lang="RU", key="nationality")}",
+                                     reply_markup=i_get_cancel_keyboard()
+                                     )
 
             case "term_time_address":
                 await message.answer(
@@ -246,7 +274,7 @@ class RegistrationScene(Scene, state="registration_scene"):
                     f"📞 Телефон: {user_data.get('phone', '❌ Не указан')}\n"
                     f"📧 Email: {user_data.get('email', 'Не указан')}\n"
                     f"📅 Дата рождения: {user_data.get('birth_date', '❌ Не указана')}\n"
-                    f"🌍 Национальность: {user_data.get('nationality', '❌ Не указана')}\n"
+                    f"🌍 Гражданство: {user_data.get('nationality', '❌ Не указана')}\n"
                     f"🏠 Адрес: {user_data.get('term_time_address', '❌ Не указан')}\n"
                     f"👨‍👩‍👦 Родители: {user_data.get('parents_info', '❌ Не указаны')}\n\n"
                     "Все данные верны?",
@@ -345,17 +373,16 @@ class RegistrationScene(Scene, state="registration_scene"):
                 user_data["group"] = message.text.strip().upper()
 
             case "phone":
-                phone = message.text.strip()
-                if not re.match(r"^(\+375)?\d{9}$", phone):
+                raw_phone = message.text.strip()
+                phone = await self.normalize_phone(raw_phone)
+
+                # Проверяем финальный формат
+                if not re.match(r'^\+375\d{9}$', phone):
                     await message.answer(
-                        "❌ Неверный формат телефона.\nПример: +79001234567 или 89001234567",
+                        "❌ Неверный формат телефона.\nПример: +375XXXXXXXXX или 375XXXXXXXXX",
                         reply_markup=r_get_phone_keyboard()
                     )
                     return
-                # if phone.startswith('8'):
-                #     phone = '+7' + phone[1:]
-                # elif not phone.startswith('+'):
-                #     phone = '+7' + phone
                 user_data["phone"] = phone
 
                 # ✅ Удаляем клавиатуру после ввода телефона
