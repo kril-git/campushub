@@ -10,6 +10,7 @@ from core.config import settings
 from database.connection import connection
 from models import User, PersonalRecordCard
 from services.EnumRoles import Roles
+from services.admin_services import get_uuid_str
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +45,26 @@ async def create_new_user(session: AsyncSession, user: User) -> User:
 
 @connection
 async def get_user_by_uuid(session: AsyncSession, uuid: str | int) -> User:
-    if isinstance(uuid, int):
-        stmt = select(User).where(User.uuid == str(uuid))
-    else:
-        stmt = select(User).where(User.uuid == uuid)
+    uuid_str = await get_uuid_str(uuid=uuid)
+    stmt = select(User).where(User.uuid == uuid_str)
     result: Result = await session.execute(stmt)
     user: User = result.scalar()
     return user
 
+
+@connection
+async def get_given_name_by_uuid(session: AsyncSession, uuid: str | int) -> str | None:
+    """
+    Получить given_name пользователя по uuid.
+
+    Returns:
+        str | None: given_name или None, если не найден
+    """
+    uuid_str = await get_uuid_str(uuid=uuid)
+    stmt = select(PersonalRecordCard.given_name).where(PersonalRecordCard.uuid == uuid_str)
+    result: Result = await session.execute(stmt)
+    given_name: str | None = result.scalar()
+    return given_name
 
 @connection
 async def update_last_visit(session: AsyncSession, uuid: str | int):

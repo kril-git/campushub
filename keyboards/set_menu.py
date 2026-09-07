@@ -20,12 +20,3 @@ async def set_main_menu(bot: Bot, uuid: int | str):
     ]
     await bot.set_my_commands(main_menu_commands)
 
-
-# async def set_main_menu_(bot: Bot):
-#     lexicon_menu = LEXICON_MENU_USER
-#     main_menu_commands = [
-#         BotCommand(command=command,
-#                    description=description
-#                    ) for command, description in lexicon_menu.items()
-#     ]
-#     await bot.set_my_commands(main_menu_commands)

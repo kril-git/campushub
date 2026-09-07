@@ -11,8 +11,14 @@ from models import User
 logger = logging.getLogger(__name__)
 
 
-async def send_admin_help(data: dict, message: Message):
-    pass
+# async def send_admin_help(data: dict, message: Message):
+#     pass
+
+async def get_uuid_str(uuid: str | int) -> str:
+    if isinstance(uuid, int):
+        return str(uuid)
+    else:
+        return uuid
 
 
 async def _is_admin(uuid: int | str) -> bool:

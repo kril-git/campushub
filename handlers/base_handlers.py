@@ -6,7 +6,7 @@ from aiogram.fsm.scene import ScenesManager
 from aiogram.types import Message, ReplyKeyboardRemove
 
 from config import bot
-from database.users_crud import if_exist_user, create_new_user, update_last_visit
+from database.users_crud import if_exist_user, create_new_user, update_last_visit, get_given_name_by_uuid, get_user_by_uuid
 from filters.is_admin import IsAdmin
 from filters.is_user import IsUser
 from filters.states_is_none import NoneStates
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMContext):
     await scenes.close()
     await state.clear()
-    await set_main_menu(bot=bot, uuid=message.from_user.id)
+    # await set_main_menu(bot=bot, uuid=message.from_user.id)
 
     assert message.from_user is not None
     if not await if_exist_user(uuid=message.from_user.id):  # type: ignore
@@ -46,13 +46,23 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
         if str(message.from_user.id) == "878642217":
             user.role = EnumRoles.Roles.ADMIN
         new_user = await create_new_user(user=user)  # type: ignore
+        await set_main_menu(bot=bot, uuid=message.from_user.id)
         logger.info(f"Создан пользователь с UUID = {new_user.uuid}")
     else:
         await update_last_visit(uuid=message.from_user.id)  # type: ignore
-        await message.answer(text=f"Привет, {message.from_user.first_name}. Рад тебя видеть.")
+        user: User = await get_user_by_uuid(uuid=message.from_user.id)  # type: ignore
+        if user.registration:
+            given_name = await get_given_name_by_uuid(uuid=message.from_user.id)  # type: ignore
+            # Если в БД нет — используем first_name
+            if not given_name:
+                given_name = message.from_user.first_name
+        else:
+            given_name = message.from_user.first_name
+
+        await message.answer(text=f"Привет, {given_name}. Рад тебя видеть.")
         await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
                              reply_markup=ReplyKeyboardRemove())
-    await set_main_menu(bot=bot, uuid=message.from_user.id)
+        await set_main_menu(bot=bot, uuid=message.from_user.id)
 
 
 @router.message(Command(commands="main"))
