@@ -12,7 +12,7 @@ SSH_KEY="$HOME/.ssh/id_ed25519_campushub"
 
 
 # ПАРОЛЬ ПОЛЬЗОВАТЕЛЯ (укажите свой)
-USER_PASSWORD="Kril1966"
+USER_PASSWORD=""
 
 VENV_NAME="venv"
 BOT_SCRIPT="run.py"

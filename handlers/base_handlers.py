@@ -46,15 +46,12 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
         if str(message.from_user.id) == "878642217":
             user.role = EnumRoles.Roles.ADMIN
         new_user = await create_new_user(user=user)  # type: ignore
-        # await set_main_menu(bot=bot, uuid=message.from_user.id)
         logger.info(f"Создан пользователь с UUID = {new_user.uuid}")
     else:
-        # await set_main_menu_(bot=bot, message=message)
         await update_last_visit(uuid=message.from_user.id)  # type: ignore
         await message.answer(text=f"Привет, {message.from_user.first_name}. Рад тебя видеть.")
         await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
                              reply_markup=ReplyKeyboardRemove())
-        # await message.answer(text=f"Hello {message.from_user.first_name}", reply_markup=ReplyKeyboardRemove())
     await set_main_menu(bot=bot, uuid=message.from_user.id)
 
 
