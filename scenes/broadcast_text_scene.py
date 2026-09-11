@@ -10,6 +10,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from aiogram.utils.chat_action import ChatActionSender
 
 from services.sending_service import broadcast_text_all_users
 from database.users_crud import load_recipients
@@ -93,8 +94,8 @@ class BroadcastScene(Scene, state="broadcast"):
 
         await callback.message.edit_text("🚀 Рассылка запущена...")
         await callback.answer()
-
-        ok, failed = await broadcast_text_all_users(callback.bot, recipients, text)
+        async with ChatActionSender.typing(bot=callback.bot, chat_id=callback.message.chat.id):
+            ok, failed = await broadcast_text_all_users(callback.bot, recipients, text)
 
         await callback.message.edit_text(
             f"✅ Готово.\n\n"

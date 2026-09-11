@@ -7,7 +7,6 @@ from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError, Teleg
 from aiogram.utils.chat_action import ChatActionSender
 
 from config import bot
-# from services.broadcast_text import logger
 from services.services import _to_chat_id
 
 logger = logging.getLogger(__name__)
@@ -65,8 +64,8 @@ async def broadcast_text_all_users(bot: Bot, recipients: list[str], text: str) -
                     chat_id=chat_id,
                     text=text,
                     disable_notification=True,
-                    # parse_mode=ParseMode.HTML,
-                    parse_mode="HTML",
+                    parse_mode=ParseMode.HTML,
+                    # parse_mode="HTML",
                 )
         except TelegramRetryAfter as e:
             logger.warning("Flood limit, sleep %s", e.retry_after)

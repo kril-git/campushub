@@ -157,4 +157,6 @@ async def save_user_registration(session: AsyncSession, user_data: dict, uuid: s
 
 async def load_recipients() -> list[str]:
     # замените на реальный источник
-    return [settings.MAIN_ADMIN]
+    # return [settings.MAIN_ADMIN]
+    print(await get_all_uuids())
+    return await get_all_uuids()
