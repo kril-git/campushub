@@ -1,21 +1,19 @@
 import logging
-from typing import Sequence
 
-from sqlalchemy import select, Result, update, and_, RowMapping
+from sqlalchemy import select, Result, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import connection
 from database.users_crud import get_user_by_uuid
-from models import User
-# , UserPool, Pool)
+from models import User, PersonalRecordCard
 from services.EnumRoles import Roles
 from core.config import settings
+import pandas as pd
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
 
-#
-#
 @connection
 async def set_role(session: AsyncSession, uuid: str | int) -> User:
     if isinstance(uuid, int):
@@ -41,52 +39,59 @@ async def get_user_all(session: AsyncSession) -> list[User]:
     result: Result = await session.execute(stmt)
     # users = await session.scalars(stmt)
     return list(result.scalars().all())
-#
-#
-# @connection
-# async def get_user_by_uuid(session: AsyncSession, uuid: str | int) -> User | None:
-#     stmt = select(User).where(User.uuid == str(uuid))
-#     result: Result = await session.execute(stmt)
-#     user: User | None = result.scalar_one_or_none()
-#     return user
-#
-#
-# @connection
-# async def get_users_pools_all_or_one(session: AsyncSession, user_uuid: str | None) -> list[UserPool]:
-#     if user_uuid is None:
-#         stmt = select(UserPool).where(UserPool.end_pool == bool(True)).order_by(UserPool.user_uuid)
-#     else:
-#         stmt = (select(UserPool)
-#                 .where(and_(UserPool.end_pool == bool(True), UserPool.user_uuid == user_uuid))
-#                 .order_by(UserPool.user_uuid))
-#     result = await session.execute(stmt)
-#     return list(result.scalars().all())
-#
-#
-# @connection
-# async def get_users_pools_join_user(session: AsyncSession, user_uuid: str | None = None) -> Sequence[RowMapping]:
-#     if user_uuid is None:
-#         stmt = (select(UserPool.pool_id,
-#                        UserPool.user_uuid,
-#                        UserPool.user_uuid,
-#                        UserPool.step,
-#                        UserPool.end_pool,
-#                        User.first_name,
-#                        Pool.pool_category)
-#                 .where(UserPool.end_pool == bool(True))
-#                 .join(User, User.uuid == UserPool.user_uuid)
-#                 .join(Pool, Pool.id == UserPool.pool_id)
-#                 .order_by(UserPool.user_uuid))
-#     else:
-#         stmt = (select(UserPool.pool_id,
-#                        UserPool.user_uuid,
-#                        UserPool.user_uuid,
-#                        UserPool.step,
-#                        UserPool.end_pool,
-#                        User.first_name)
-#                 .where(and_(UserPool.end_pool == bool(True), UserPool.user_uuid == user_uuid))
-#                 .join(User, User.uuid == UserPool.user_uuid)
-#                 .order_by(UserPool.user_uuid))
-#     result = await session.execute(stmt)
-#
-#     return result.mappings().all()
+
+
+@connection
+async def export_users_to_excel(
+        session: AsyncSession,
+        filename: str = "users.xlsx",
+        return_bytes: bool = False
+):
+    """
+    Асинхронный экспорт пользователей в Excel
+
+    Args:
+        session: Передаётся через @connection
+        filename: Имя файла для сохранения
+        return_bytes: Если True - возвращает BytesIO
+    """
+    # 1. ORM-запрос (сессия уже передана)
+    stmt = select(PersonalRecordCard)
+    result = await session.execute(stmt)
+    users = result.scalars().all()
+
+    # 2. Формируем данные
+    data = []
+    for user in users:
+        data.append({
+            "Фамилия": user.surname or "",
+            "Имя": user.given_name or "",
+            "Отчество": user.middle_name or "",
+            "Email": user.email or "",
+            "Телефон": user.phone or "",
+            "Дата рождения": user.birth_date or "",
+            "Гражданство": user.nationality or "",
+            "Место проживания": user.term_time_address or "",
+            "Информация о родителях": user.parents_info or "",
+            "Состояние семьи": user.status_family or "",
+            "Многодетность": user.children or "",
+            "Обеспеченность": user.low_income_family or "",
+            "Инвалиды в семье": user.disability or "",
+            "Член БРСМ": user.brsm or "",
+            "Последствия ЧАЭС": user.cas or "",
+        })
+
+    # 3. Создаём DataFrame
+    df = pd.DataFrame(data)
+
+    if return_bytes:
+        # Возвращает BytesIO
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Пользователи")
+        output.seek(0)
+        return output
+    else:
+        # Возвращает строку
+        df.to_excel("users.xlsx", index=False)
+        return f"✅ Экспортировано {len(data)} записей в users.xlsx"

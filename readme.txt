@@ -75,6 +75,9 @@
 logs
 
 
+9.
+        which python
+
 
 пароль vds - Kril1966dzm
 

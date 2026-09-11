@@ -32,3 +32,7 @@ yarl==1.22.0
 sshtunnel~=0.4.0
 paramiko~=3.5.1
 asyncssh~=2.23.0
+pip~=26.0.1
+cryptography~=46.0.5
+pandas~=3.0.5
+openpyxl~=3.1.5

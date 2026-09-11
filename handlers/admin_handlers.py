@@ -8,16 +8,13 @@ from aiogram.types import Message
 from aiogram.utils.chat_action import ChatActionSender
 
 from config import bot
-from database.admin_crud import get_user_all, set_role
+from database.admin_crud import get_user_all, set_role, export_users_to_excel
 from database.users_crud import get_user_by_uuid
-# from database.admin_crud import get_user_all, get_users_pools_join_user
-# from database.dao.pool_repository import DAOPools
 from filters.is_admin import IsAdmin
 from keyboards.reply_keyboar import r_kb_cancel
 from models import User
 from services.admin_services import send_users_list, send_users_list_4096
-from services.user_services import send_list
-from states.admin_states import FSMSetUserToAdmin, FSMUserAnswers
+from states.admin_states import FSMSetUserToAdmin
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -33,80 +30,24 @@ async def get_users(message: Message):
         await message.answer(text=f"Итого зарегистрированною {count} пользователей")
 
 
-#
-#
-# @router.message(Command(commands="list_users_pools"), IsAdmin())
-# @flags.chat_action(action=ChatAction.TYPING)
-# async def get_users_pools(message: Message):
-#     data = await get_users_pools_join_user(user_uuid=None)
-#     count: int = 1
-#     items: list[str] = []
-#     list_items: list[str] = []
-#
-#     for item in data:
-#         if len(f"{count}, {item["user_uuid"]}, {item["first_name"]}, {item["pool_id"]}, {item["end_pool"]},"
-#                f" {item["step"]}, {item["pool_category"].name}\n") + len("".join(items)) < 4096:
-#             items.append(f"{count}, {item["user_uuid"]}, {item["first_name"]},"
-#                          f" {item["pool_id"]}, {item["end_pool"]}, {item["step"]}, {item["pool_category"].name}\n")
-#         else:
-#             list_items.append("".join(items))
-#             items.clear()
-#             items.append(f"{count}, {item["user_uuid"]}, {item["first_name"]},"
-#                          f"{item["pool_id"]}, {item["end_pool"]}, {item["step"]}, {item["pool_category"].name}\n")
-#             count += 1
-#     list_items.append("".join(items))
-#     await send_list(message=message, data=list_items)
-#
-#
-# @router.message(Command(commands="list_users_answers"), IsAdmin())
-# @flags.chat_action(action=ChatAction.TYPING)
-# async def get_users_answers(message: Message, state: FSMContext):
-#     await state.set_state(FSMUserAnswers.get_id)
-#     await message.answer(text=f"Введите ID пользователя ответы которого Вас интересуют."
-#                               f"Или наберите /exit для выхода.")
-#
-#
-# @router.message(F.text, FSMUserAnswers.get_id)
-# async def get_users_answers(message: Message, state: FSMContext):
-#     await state.clear()
-#     data = await DAOPools.get_answer_by_user_id(user_uuid=message.text)
-#     items: list[str] = []
-#     list_items: list[str] = []
-#     for item in data:
-#         if len(f"{item["question_number"]}, {item["pool_question"]}\n\n"
-#                f"ОТВЕТ: {item["pool_answer"]}\n\n") + len("".join(items)) < 4096:
-#             items.append(f"<b>{item["question_number"]}, {item["pool_question"]}</b>\n\n"
-#                          f"ОТВЕТ: <i>{item["pool_answer"]}</i>\n\n")
-#         else:
-#             list_items.append("".join(items))
-#             items.clear()
-#             items.append(f"<b>{item["question_number"]}, {item["pool_question"]}</b>\n\n"
-#                          f"ОТВЕТ: <i>{item["pool_answer"]}</i>\n\n")
-#             # count += 1
-#     list_items.append("".join(items))
-#     await send_list(message=message, data=list_items)
-#
-#
-# @router.message(Command(commands="exit"), FSMUserAnswers)
-# async def get_users_answers(message: Message, state: FSMContext):
-#     await state.clear()
-#     await message.answer(text="Успешно вышли.")
-#
-#
-# # for item in data:
-# #     if len(f"{count}, {item["user_uuid"]}, {item["first_name"]}, {item["pool_id"]}, {item["end_pool"]},"
-# #            f" {item["step"]}, {item["pool_category"].name}\n") + len("".join(items)) < 4096:
-# #         items.append(f"{count}, {item["user_uuid"]}, {item["first_name"]},"
-# #                      f" {item["pool_id"]}, {item["end_pool"]}, {item["step"]}, {item["pool_category"].name}\n")
-# #     else:
-# #         list_items.append("".join(items))
-# #         items.clear()
-# #         items.append(f"{count}, {item["user_uuid"]}, {item["first_name"]},"
-# #                      f"{item["pool_id"]}, {item["end_pool"]}, {item["step"]}, {item["pool_category"].name}\n")
-# #         count += 1
-# # list_items.append("".join(items))
-# # await send_list(message=message, data=list_items)
-#
+@router.message(Command("export_users_to_exel"), IsAdmin())
+async def export_users_command(message: types.Message):
+    await message.answer("⏳ Формирую отчёт...")
+
+    # Вызываем функцию (сессия передаётся через @connection)
+    excel_file = await export_users_to_excel(return_bytes=True)  # type: ignore
+
+    if excel_file:
+        await message.answer_document(
+            types.BufferedInputFile(
+                excel_file.getvalue(),
+                filename="users.xlsx"
+            ),
+            caption="📊 Отчёт по пользователям"
+        )
+    else:
+        await message.answer("❌ Нет данных для экспорта")
+
 
 # рабочий
 @router.message(Command(commands="create_admin"), IsAdmin())
