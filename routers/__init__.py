@@ -20,53 +20,56 @@ from scenes import load_pool_json_scene
 from scenes import complete_a_survey_scene
 from scenes import registration_scene
 from scenes.registration_scene import router as registration_router, RegistrationScene
+from scenes.broadcast_text_scene import router as broadcast_text_router, BroadcastScene
+from scenes import broadcast_text_scene
 
 # from scenes.complete_a_survey_scene import router as complete_a_survey_router
 
 router = Router(name=__name__)
 
-
 # ✅ Возвращаем роутер с командой
-def get_routers() -> Router:
-    """Возвращает роутер с командой /registration"""
-    router_s = Router(name="registration_router")
+# def get_routers() -> Router:
+#     """Возвращает роутер с командой /registration"""
+#     router_s = Router(name="registration_router")
+#
+#     # Регистрируем команду
+#     router_s.message.register(
+#         RegistrationScene.as_handler(),
+#         Command("registration")
+#     )
+#
+#     # Можно зарегистрировать дополнительные команды
+#     router_s.message.register(
+#         RegistrationScene.as_handler(),
+#         Command("reg")  # Альтернативная команда
+#     )
+#
+#     return router_s
 
-    # Регистрируем команду
-    router_s.message.register(
-        RegistrationScene.as_handler(),
-        Command("registration")
-    )
 
-    # Можно зарегистрировать дополнительные команды
-    router_s.message.register(
-        RegistrationScene.as_handler(),
-        Command("reg")  # Альтернативная команда
-    )
-
-    return router_s
-
-
-router.include_routers(
+router.include_router(
     admin_router,
-    registration_router,
-    get_routers(),
-    echo_router,
+    # registration_router,
+    # broadcast_text_router,
+    # echo_router,
 )
+
+router.message.register(
+    RegistrationScene.as_handler(),
+    Command("registration")
+)
+
+router.message.register(
+    BroadcastScene.as_handler(),
+    Command("broadcast")
+)
+
+router.include_router(echo_router)
 
 
 def get_scenes() -> list[type(Scene)]:
     return [
-        registration_scene.RegistrationScene
-        # settings_scene.SettingsScene,
-        # accounting_products.AccountingProductsScene,
-        # accounting_category.AccountingCategoryScene,
-        # load_pool_json_scene.LoadPoolJsonScene,
-        # complete_a_survey_scene.CompleteSurvey
+        registration_scene.RegistrationScene,
+        broadcast_text_scene.BroadcastScene,
 
     ]
-
-
-# def get_routers() -> list[Router]:
-#     return [
-#         settings_scene.router
-#     ]

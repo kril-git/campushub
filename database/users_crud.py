@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 
 
 @connection
+async def get_all_uuids(session: Optional[AsyncSession], and_admin=True) -> list[str]:
+    result_admin = []
+    if and_admin:
+        result_admin = await session.execute(
+                select(User.uuid).where(User.role == Roles.ADMIN))
+
+    result = await session.execute(select(PersonalRecordCard.uuid))
+    # return list(result.scalars().all()) + list(result_admin.scalars().all())
+    return list({*result.scalars().all(), *result_admin.scalars().all()})
+
+
+@connection
 async def if_exist_user(session: Optional[AsyncSession], uuid: str | int) -> bool | None:
     """
     :param session:
@@ -65,6 +77,7 @@ async def get_given_name_by_uuid(session: AsyncSession, uuid: str | int) -> str 
     result: Result = await session.execute(stmt)
     given_name: str | None = result.scalar()
     return given_name
+
 
 @connection
 async def update_last_visit(session: AsyncSession, uuid: str | int):
@@ -140,3 +153,8 @@ async def save_user_registration(session: AsyncSession, user_data: dict, uuid: s
         logger.error(f"❌ Ошибка при сохранении данных пользователя {uuid}: {e}")
         await session.rollback()
         return None
+
+
+async def load_recipients() -> list[str]:
+    # замените на реальный источник
+    return [settings.MAIN_ADMIN]
