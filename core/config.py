@@ -53,6 +53,8 @@ class Settings(BaseSettings):
 
     PASSWORDS: str | None
 
+    MAX_MESSAGE_LENGTH: int
+
     @property
     def DATABASE_URL(self):
         if self.USE_TUNNEL:

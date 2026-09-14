@@ -1,16 +1,12 @@
-import asyncio
+import functools
 import logging
-from functools import wraps
-from typing import ParamSpec, TypeVar, Callable, Awaitable, Optional
+from typing import ParamSpec, TypeVar, Callable, Awaitable, Concatenate
 
-import asyncpg
-import asyncssh
-import redis
-from aiogram import Dispatcher
 from aiogram.exceptions import TelegramNetworkError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import settings
 from database.db_helper import db_helper
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +14,9 @@ P = ParamSpec("P")  # 👈 P - это "параметры функции"
 T = TypeVar("T")  # T - это "любой тип, но один и тот же во всей функции"
 
 
-def connection(method: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+def connection(
+    method: Callable[Concatenate[AsyncSession, P], Awaitable[T]],
+) -> Callable[P, Awaitable[T]]:
     """
     Callable — это способ сказать типизатору:
     "Эта переменная/параметр является функцией,
@@ -54,16 +52,20 @@ def connection(method: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
 
     """
 
-    @wraps(method)  # 👈 Копирует метаданные из method в wrapper
+    @functools.wraps(method) # 👈 Копирует метаданные из method в wrapper
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         async with db_helper.session_factory() as session:
             try:
-                return await method(*args, session=session, **kwargs)
+                return await method(session, *args, **kwargs)
             except TelegramNetworkError as e:
-                logger.error(f"TelegramNetworkError в модуле connection.py {method.__name__}: {e}")
+                logger.error(
+                    f"TelegramNetworkError в {method.__name__}: {e}"
+                )
             except Exception as e:
                 await session.rollback()
-                logger.exception(f"Ошибка бд в {method.__name__}: {type(e).__name__}: {e}")
+                logger.exception(
+                    f"Ошибка БД в {method.__name__}: {type(e).__name__}: {e}"
+                )
                 raise
 
     return wrapper

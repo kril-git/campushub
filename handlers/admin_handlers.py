@@ -8,12 +8,15 @@ from aiogram.types import Message
 from aiogram.utils.chat_action import ChatActionSender
 
 from config import bot
-from database.admin_crud import get_user_all, set_role, export_users_to_excel
+from core.config import settings
+from database.admin_crud import get_user_all, set_role, export_users_to_excel, get_personal_record_short
+from database.dao.personal_repository import _get_personal_record_short
 from database.users_crud import get_user_by_uuid
 from filters.is_admin import IsAdmin
 from keyboards.reply_keyboar import r_kb_cancel
 from models import User
-from services.admin_services import send_users_list, send_users_list_4096
+from services.admin_services import send_users_list_4096, split_into_chunks, send_chunks, split_strings_into_chunks
+from services.render import render_users
 from states.admin_states import FSMSetUserToAdmin
 
 router = Router(name=__name__)
@@ -26,8 +29,24 @@ logger = logging.getLogger(__name__)
 async def get_users(message: Message):
     async with ChatActionSender.typing(bot=bot, chat_id=message.chat.id):
         users: list[User] = await get_user_all()
-        count = await send_users_list_4096(message=message, users=users)
-        await message.answer(text=f"Итого зарегистрированною {count} пользователей")
+        lines = [render_users(i, u) for i, u in enumerate(users, start=1)]
+        chunks, total = split_strings_into_chunks(lines, limit=settings.MAX_MESSAGE_LENGTH)
+
+        # render_users = lambda i, u: f"{i}, {u.uuid}, {u.first_name}, {u.role.name}\n"
+        # chunks, total_lines = split_into_chunks(items=users, render=render_users, limit=settings.MAX_MESSAGE_LENGTH)
+        await send_chunks(message, chunks=chunks)
+
+        # count = await send_users_list_4096(message=message, users=users)
+        await message.answer(text=f"Итого зарегистрированною {total} пользователей.\n"
+                                  f"Количество chunks {len(chunks)}.")
+
+
+@router.message(Command(commands="get_person_data_short"), IsAdmin())
+async def get_person_data(message: Message):
+    async with ChatActionSender.typing(bot=bot, chat_id=message.chat.id):
+        lines: list[str] = await _get_personal_record_short()
+        chunks, total = split_strings_into_chunks(lines)
+        await send_chunks(message, chunks=chunks)
 
 
 @router.message(Command("export_users_to_exel"), IsAdmin())
@@ -54,7 +73,11 @@ async def export_users_command(message: types.Message):
 @flags.chat_action(action=ChatAction.TYPING)
 async def set_user_to_admin(message: Message, state: FSMContext):
     users: list[User] = await get_user_all()
-    await send_users_list(message=message, users=users)
+    # await send_users_list(message=message, users=users)
+    render_users = lambda i, u: f"{i}, {u.uuid}, {u.first_name}, {u.role.name}, {u.registration}\n"
+    chunks, total_lines = split_into_chunks(users, render_users, limit=settings.MAX_MESSAGE_LENGTH)
+
+    await send_chunks(message, chunks=chunks)
     await state.set_state(FSMSetUserToAdmin.fill_uuid)
     await message.answer(text=f"Введите ID пользователя. \nИли нажмите ОТМЕНА. 👇",
                          reply_markup=r_kb_cancel)

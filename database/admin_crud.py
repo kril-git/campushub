@@ -31,8 +31,17 @@ async def set_role(session: AsyncSession, uuid: str | int) -> User:
     return user
 
 
-#
-#
+@connection
+async def get_personal_record_short(session: AsyncSession):
+    rows = await session.execute(select(PersonalRecordCard.uuid,
+                                        PersonalRecordCard.surname,
+                                        PersonalRecordCard.given_name,
+                                        PersonalRecordCard.phone))
+    lines = [f"{i}, {uuid}, {surname}, {given_name}, {phone}\n"
+             for i, (uuid, surname, given_name, phone) in enumerate(rows, start=1)]
+    return lines
+
+
 @connection
 async def get_user_all(session: AsyncSession) -> list[User]:
     stmt = (select(User))

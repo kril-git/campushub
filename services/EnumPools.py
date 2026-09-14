@@ -3,6 +3,7 @@ from typing import Any
 
 
 class PoolCategory(Enum):
+    NONE = 0
     ALL = 1
     SALON = 2
     RETAIL = 3
@@ -13,4 +14,4 @@ class PoolCategory(Enum):
         for item in cls:
             if item.name == value:
                 return item.name
-        return cls.ALL
+        return cls.NONE

@@ -1,7 +1,13 @@
+from .pool import Pool, PoolQuestion, PoolAnswer, UserPool, Answer
 from .users import User
 from .base import Base
 from .personalrecordcard import PersonalRecordCard
 
 __all__ = ("User",
-           "PersonalRecordCard"
+           "PersonalRecordCard",
+           "Pool",
+           "PoolQuestion",
+           "PoolAnswer",
+           "Answer",
+           "UserPool",
            )

@@ -22,6 +22,10 @@ from scenes import registration_scene
 from scenes.registration_scene import router as registration_router, RegistrationScene
 from scenes.broadcast_text_scene import router as broadcast_text_router, BroadcastScene
 from scenes import broadcast_text_scene
+from scenes.load_pool_json_scene import router as load_pool_json_scene, LoadPoolJsonScene
+from scenes import load_pool_json_scene
+from scenes.complete_a_survey_scene import router as complete_a_survey_router, CompleteSurvey
+from scenes import complete_a_survey_scene
 
 # from scenes.complete_a_survey_scene import router as complete_a_survey_router
 
@@ -64,6 +68,16 @@ router.message.register(
     Command("broadcast")
 )
 
+router.message.register(
+    LoadPoolJsonScene.as_handler(),
+    Command("create_pool")
+)
+
+router.message.register(
+    CompleteSurvey.as_handler(),
+    Command("complete_a_survey")
+)
+
 router.include_router(echo_router)
 
 
@@ -71,5 +85,7 @@ def get_scenes() -> list[type(Scene)]:
     return [
         registration_scene.RegistrationScene,
         broadcast_text_scene.BroadcastScene,
+        load_pool_json_scene.LoadPoolJsonScene,
+        complete_a_survey_scene.CompleteSurvey,
 
     ]

@@ -111,6 +111,9 @@ LEXICON_ADMIN_HELP: dict[str, dict[str, str]] = {
         "/list_users": "получить список пользователей",
         "/export_users_to_exel": "создать файл зарегистрированных пользователей",
         "/broadcast": "отправить текстовую рассылку",
+        "/create_pool": "создать опрос",
+        "/complete_a_survey": "Пройти опрос",
+        "/get_person_data_short": "Показать персональные данные короткие",
 
     },
     "EN": {
