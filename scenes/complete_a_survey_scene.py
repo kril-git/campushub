@@ -30,7 +30,7 @@ class CompleteSurvey(Scene, state="complete_a_survey"):
 
         await state.update_data(pool_id=pool_id, answer_list=[], question=0)
 
-        completed = await DAOPools.check_survey_completion(
+        completed: bool = await DAOPools.check_survey_completion(
             pool_id=pool_id, user_uuid=str(message.from_user.id)
         )
         await state.update_data(replay=completed)
@@ -70,7 +70,7 @@ class CompleteSurvey(Scene, state="complete_a_survey"):
         )
 
         await message.answer(
-            f"Категория {PoolCategory.SALON.name}\n"
+            # f"Категория {PoolCategory.SALON.name}\n"
             f"Описание {pool.pool_description}\n"
             f"Количество основных вопросов — {count_questions}",
             reply_markup=create_i_kb_begin(pool_id=0, pool_question=0, pool_answer=0),

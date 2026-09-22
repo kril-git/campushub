@@ -1,3 +1,6 @@
+from datetime import datetime
+from datetime import date
+
 import logging
 
 from aiogram import Router, F
@@ -52,18 +55,29 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
                                  "Жду файл 🕰")
             logger.error("Пароль в файле не соответствует")
             return
+
+        elif datetime.strptime(data.get("start_date"), "%d.%m.%Y").date() < date.today():
+            await message.answer(text=f"Дата начала опроса меньше текущей, проверьте дату")
+            return
+        elif (datetime.strptime(data.get("end_date"), "%d.%m.%Y").date() <= date.today()
+              or datetime.strptime(data.get("start_date"), "%d.%m.%Y").date() >= datetime.strptime(data.get("end_date"), "%d.%m.%Y").date()):
+            await message.answer(text="Проверьте дату окончания опроса она не корректна.")
+            return
         else:
+            await message.answer(text=f"Проверка файла прошла успешно 👍.\n"
+                                      f"Название файла {message.document.file_name},"
+                                      f"Записываю данные в базу данных...")
             id_pool = await create_pool(data=data, state=state)
             await state.update_data(pool_id=id_pool)
 
-        await message.answer(
-            text=await get_info_pool(pool_id=id_pool),
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        await message.answer(
-            text="Если что-то не корректно, отредактируйте JSON-файл "
-                 "и повторите: /create_pool"
-        )
+            await message.answer(
+                text=await get_info_pool(pool_id=id_pool),
+                reply_markup=ReplyKeyboardRemove(),
+            )
+            await message.answer(
+                text="Если что-то не корректно, отредактируйте JSON-файл "
+                     "и повторите: /create_pool"
+            )
 
     @on.message(F.text == "🚫 Выход")
     async def exit(self, message: Message, state: FSMContext) -> None:
@@ -88,7 +102,7 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
         )
 
 
-router.message.register(
-    LoadPoolJsonScene.as_handler(),
-    Command("json_pool_load"),
-)
+# router.message.register(
+#     LoadPoolJsonScene.as_handler(),
+#     Command("json_pool_load"),
+# )

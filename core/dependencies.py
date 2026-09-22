@@ -1,5 +1,8 @@
 # dependencies.py
+from datetime import timedelta, datetime
 from typing import ClassVar, Optional
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from redis.asyncio import Redis
 from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
 
@@ -9,6 +12,7 @@ from infrastructure.tunnelmanager import TunnelManager
 import logging
 
 from database.db_helper import DatabaseHelper, db_helper
+from services.sending_service import send_message_text_to_user, send_message_io_and_mio_moglie
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +29,8 @@ class AppDependencies:
     storage: ClassVar[Optional[RedisStorage]] = None
     use_tunnel: ClassVar[bool] = True
     _initialized: ClassVar[bool] = False
+    # Создаем планировщик, можно указать часовой пояс
+    scheduler: AsyncIOScheduler() = None
 
     @classmethod
     async def initialize(cls):
@@ -76,6 +82,21 @@ class AppDependencies:
             state_ttl=60 * 60 * 24,
             data_ttl=60 * 60 * 48,
         )
+        cls.scheduler = AsyncIOScheduler(timezone="Europe/Minsk")
+        cls.scheduler.start()
+        cls.scheduler.add_job(send_message_text_to_user,
+                              "date",
+                              run_date=datetime.now() + timedelta(minutes=5),
+                              kwargs={
+                                  "uuid": settings.MAIN_ADMIN,
+                                  "text": "Привет",
+                              }
+                              )
+        cls.scheduler.add_job(send_message_io_and_mio_moglie,
+                              "date",
+                              run_date=(datetime.now() + timedelta(days=1)).replace(
+                                  hour=9, minute=0, second=0, microsecond=0)
+                              )
 
         cls._initialized = True
         logger.info(f"✅ Зависимости инициализированы {'(туннель)' if cls.use_tunnel else '(локально)'}")

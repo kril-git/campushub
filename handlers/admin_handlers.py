@@ -10,7 +10,8 @@ from aiogram.utils.chat_action import ChatActionSender
 from config import bot
 from core.config import settings
 from database.admin_crud import get_user_all, set_role, export_users_to_excel, get_personal_record_short
-from database.dao.personal_repository import _get_personal_record_short
+from services.personal_record import get_personal_record_short_lines, get_personal_record_short_lines_render
+from database.dao.personal_record_repository import PersonalRecordDAO
 from database.users_crud import get_user_by_uuid
 from filters.is_admin import IsAdmin
 from keyboards.reply_keyboar import r_kb_cancel
@@ -28,15 +29,11 @@ logger = logging.getLogger(__name__)
 @flags.chat_action(action=ChatAction.TYPING)
 async def get_users(message: Message):
     async with ChatActionSender.typing(bot=bot, chat_id=message.chat.id):
-        users: list[User] = await get_user_all()
+        users: list[User] = await get_user_all()  # type: ignore
         lines = [render_users(i, u) for i, u in enumerate(users, start=1)]
         chunks, total = split_strings_into_chunks(lines, limit=settings.MAX_MESSAGE_LENGTH)
-
-        # render_users = lambda i, u: f"{i}, {u.uuid}, {u.first_name}, {u.role.name}\n"
-        # chunks, total_lines = split_into_chunks(items=users, render=render_users, limit=settings.MAX_MESSAGE_LENGTH)
         await send_chunks(message, chunks=chunks)
 
-        # count = await send_users_list_4096(message=message, users=users)
         await message.answer(text=f"Итого зарегистрированною {total} пользователей.\n"
                                   f"Количество chunks {len(chunks)}.")
 
@@ -44,9 +41,12 @@ async def get_users(message: Message):
 @router.message(Command(commands="get_person_data_short"), IsAdmin())
 async def get_person_data(message: Message):
     async with ChatActionSender.typing(bot=bot, chat_id=message.chat.id):
-        lines: list[str] = await _get_personal_record_short()
+        lines: list[str] = await get_personal_record_short()  # type: ignore
+        # lines: list[str] = await get_personal_record_short_lines_render()  # type: ignore
         chunks, total = split_strings_into_chunks(lines)
         await send_chunks(message, chunks=chunks)
+        await message.answer(text=f"Итого зарегистрированною {total} пользователей.\n"
+                                  f"Количество chunks {len(chunks)}.")
 
 
 @router.message(Command("export_users_to_exel"), IsAdmin())

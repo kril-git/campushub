@@ -12,12 +12,13 @@ def render_users(index: int, user: User) -> str:
     )
 
 
-def render_reg_user(index: int, user: PersonalRecordCard) -> str:
+def render_personal_record(index: int, row: tuple[str, str, str, str]) -> str:
     """
     Таблица personalrecordcard
     Возвращает index, uuid,surname, given_name, phone
 
     """
+    uuid, surname, given_name, phone = row
     return (
-        f"{index}, {user.uuid}, {user.surname}, {user.given_name}, {user.phone}\n"
+        f"{index}, {uuid}, {surname}, {given_name}, {phone}\n"
     )

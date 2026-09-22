@@ -1,4 +1,6 @@
-from sqlalchemy import String, Enum, Integer, ForeignKey, Boolean
+from datetime import date
+
+from sqlalchemy import String, Enum, Integer, ForeignKey, Boolean, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -15,6 +17,8 @@ class Pool(Base, Mixin):
 
     poolquestion: Mapped[list["PoolQuestion"]] = relationship("PoolQuestion", back_populates="pool")
     is_salute: Mapped[bool] = mapped_column(Boolean, unique=False, default=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     def __str__(self):
         return (f"pool_id: {self.id}\n"

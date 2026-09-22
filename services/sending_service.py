@@ -7,9 +7,16 @@ from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError, Teleg
 from aiogram.utils.chat_action import ChatActionSender
 
 from config import bot
+from core.config import settings
 from services.services import _to_chat_id
 
 logger = logging.getLogger(__name__)
+
+
+async def send_message_io_and_mio_moglie():
+    user_id = [settings.MAIN_ADMIN, "709231639"]
+    for id in user_id:
+        await send_message_text_to_user(uuid=id, text="Доброе утро!")
 
 
 async def send_message_text_to_user(

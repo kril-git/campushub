@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 from typing import Any
 
@@ -35,15 +36,15 @@ async def get_data_from_json(message: Message) -> Any:
                                   f"и начните заново. /json_pool_load")
         raise e
 
-    if data["password"] in get_passwords():
-        await message.answer(text=f"👍 Проверка прошла успешно!\n"
-                                  f"Ожидайте, сохраняю информацию в базе данных\n"
-                                  f"После завершения отправлю информацию для проверки.\n"
-                                  f"🎯")
-        return data
-    else:
-        await message.answer(text="👎 Пароль в файле не совпадает с контрольным")
-        return None
+    # if data["password"] in get_passwords():
+    #     await message.answer(text=f"👍 Проверка прошла успешно!\n"
+    #                               f"Ожидайте, сохраняю информацию в базе данных\n"
+    #                               f"После завершения отправлю информацию для проверки.\n"
+    #                               f"🎯")
+    return data
+    # else:
+    #     await message.answer(text="👎 Пароль в файле не совпадает с контрольным")
+    #     return None
 
 
 async def create_pool_data():
@@ -52,12 +53,15 @@ async def create_pool_data():
 
 async def create_pool(data: Any, state: FSMContext) -> int:
     pool_data: dict = {}
-    logger.info("Пароль в файле соответствует действующему.")
+    # logger.info("Пароль в файле соответствует действующему.")
     pool: Pool = Pool()
     pool.pool_description = data["pool_description"]
     pool.pool_uuid = get_timestamp()
     pool.pool_category = PoolCategory.get_category(value=data["pool_category"])
     pool.pool_action = PoolAction.ACTION
+    pool.is_salute = data["is_salute"]
+    pool.start_date = datetime.strptime(data.get("start_date"), "%d.%m.%Y").date()
+    pool.end_date = datetime.strptime(data.get("end_date"), "%d.%m.%Y").date()
 
     pool_record = await DAOPools.add_pool_record(data=pool)
 

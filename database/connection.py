@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.db_helper import db_helper
 
-
 logger = logging.getLogger(__name__)
 
 P = ParamSpec("P")  # 👈 P - это "параметры функции"
@@ -15,7 +14,7 @@ T = TypeVar("T")  # T - это "любой тип, но один и тот же 
 
 
 def connection(
-    method: Callable[Concatenate[AsyncSession, P], Awaitable[T]],
+        method: Callable[Concatenate[AsyncSession, P], Awaitable[T]],
 ) -> Callable[P, Awaitable[T]]:
     """
     Callable — это способ сказать типизатору:
@@ -52,7 +51,7 @@ def connection(
 
     """
 
-    @functools.wraps(method) # 👈 Копирует метаданные из method в wrapper
+    @functools.wraps(method)  # 👈 Копирует метаданные из method в wrapper
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         async with db_helper.session_factory() as session:
             try:
@@ -69,4 +68,3 @@ def connection(
                 raise
 
     return wrapper
-
