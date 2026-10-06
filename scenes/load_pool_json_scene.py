@@ -1,8 +1,7 @@
 import json
-from datetime import datetime
-from datetime import date
-
 import logging
+from datetime import date
+from datetime import datetime
 from json import JSONDecodeError
 
 from aiogram import Router, F
@@ -14,10 +13,9 @@ from aiogram.fsm.scene import Scene, on
 from aiogram.types import Message, ReplyKeyboardRemove
 
 from core.config import settings
-from exceptions.jsonloaderror import JsonLoadError
-from filters.is_admin import IsAdmin, is_admin
+from filters.is_admin import is_admin
 from keyboards.reply_keyboar import r_kb_load_exit, r_kb_exit
-from services.pool_services import create_pool, get_info_pool
+from services.pool_service import get_info_pool, PoolService
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -56,8 +54,6 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
             logger.error("download_file failed: %s", e)
             await message.answer("Не удалось скачать файл. Попробуйте снова.  /json_pool_load")
             return None
-
-        # downloaded_file = await download_json_from_message(message=message)
 
         # ---------- 3. Парсим ----------
         try:
@@ -107,14 +103,9 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
         if message.document.mime_type != "application/json":
             await message.answer("Я ожидаю JSON файл.")
             return
-        # try:
         data = await self._get_data_from_json(message=message)
-        # except JsonLoadError as e:
-        #     await message.answer(e.user_message)
-        #     return
         if not data:
             await message.answer(
-                # "Убедитесь в пароле и загрузите файл повторно.\n"
                 "Жду корректный файл в JSON формате 🕰"
             )
             logger.error("JSON битый")
@@ -137,20 +128,27 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
             await message.answer(text=f"Проверка файла прошла успешно 👍.\n"
                                       f"Название файла {message.document.file_name},"
                                       f"Записываю данные в базу данных...")
-            id_pool = await create_pool(data=data, state=state)
-            await state.update_data(pool_id=id_pool)
+            try:
+                pool_id = await PoolService.create_pool(data)
+            except Exception:
+                logger.exception("create_pool failed")
+                await message.answer("Ошибка при создании пула. Попробуйте позже.")
+                return
+            # id_pool = await create_pool(data=data, state=state)
+            await state.update_data(pool_id=pool_id)
 
             await message.answer(
-                text=await get_info_pool(pool_id=id_pool),
+                text=await get_info_pool(pool_id=pool_id),
                 reply_markup=ReplyKeyboardRemove(),
             )
             await message.answer(
                 text="Если что-то не корректно, отредактируйте JSON-файл "
                      "и повторите: /create_pool"
             )
+            await self.wizard.exit()
 
     @on.message(F.text == "🚫 Выход")
-    async def exit(self, message: Message, state: FSMContext) -> None:
+    async def exit(self, message: Message) -> None:
         await message.answer(
             text="Загрузка файла отменена.",
             reply_markup=ReplyKeyboardRemove(),
@@ -158,7 +156,7 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
         await self.wizard.exit()
 
     @on.message(Command("cancel"))
-    async def cancel(self, message: Message, state: FSMContext) -> None:
+    async def cancel(self, message: Message) -> None:
         await message.answer(
             text="Загрузка файла отменена.",
             reply_markup=ReplyKeyboardRemove(),
@@ -170,5 +168,3 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
         await message.answer(
             "Пожалуйста, выберите действие: 'Загрузить' или 'Выход'."
         )
-
-

@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.scene import Scene, on
 from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
 
-from database.repository.pool_repository import DAOPools
+from database.dao.pool_dao import DAOPools
 from keyboards.callback_data_factory import PoolsCallbackFactory, PoolContinueFactory
 from keyboards.inline_keyboard import create_i_kb_begin, create_i_kb_pool_answers, i_kb_continue
 from keyboards.reply_keyboar import r_kb_exit, r_kb_begin_exit

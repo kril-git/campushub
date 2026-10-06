@@ -7,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from config import settings
 # from core.dependencies import AppDependencies
-from database.repository.pool_repository import DAOPools
+from database.dao.pool_dao import DAOPools
 from services.EnumPools import PoolCategory
 from services.sending_service import send_message_text_to_user
 
