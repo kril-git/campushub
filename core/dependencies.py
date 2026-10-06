@@ -1,6 +1,8 @@
 # dependencies.py
+import asyncio
 from datetime import timedelta, datetime
 from typing import ClassVar, Optional
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from redis.asyncio import Redis
@@ -12,6 +14,7 @@ from infrastructure.tunnelmanager import TunnelManager
 import logging
 
 from database.db_helper import DatabaseHelper, db_helper
+from services.scheduled_jobs import register_jobs
 from services.sending_service import send_message_text_to_user, send_message_io_and_mio_moglie
 
 logger = logging.getLogger(__name__)
@@ -30,7 +33,9 @@ class AppDependencies:
     use_tunnel: ClassVar[bool] = True
     _initialized: ClassVar[bool] = False
     # Создаем планировщик, можно указать часовой пояс
-    scheduler: AsyncIOScheduler() = None
+    # scheduler: AsyncIOScheduler() = None
+    scheduler: ClassVar[Optional[AsyncIOScheduler]] = None
+    tz = ZoneInfo("Europe/Minsk")
 
     @classmethod
     async def initialize(cls):
@@ -82,21 +87,35 @@ class AppDependencies:
             state_ttl=60 * 60 * 24,
             data_ttl=60 * 60 * 48,
         )
-        cls.scheduler = AsyncIOScheduler(timezone="Europe/Minsk")
+        cls.scheduler = AsyncIOScheduler(timezone=cls.tz)
         cls.scheduler.start()
-        cls.scheduler.add_job(send_message_text_to_user,
-                              "date",
-                              run_date=datetime.now() + timedelta(minutes=5),
-                              kwargs={
-                                  "uuid": settings.MAIN_ADMIN,
-                                  "text": "Привет",
-                              }
-                              )
-        cls.scheduler.add_job(send_message_io_and_mio_moglie,
-                              "date",
-                              run_date=(datetime.now() + timedelta(days=1)).replace(
-                                  hour=9, minute=0, second=0, microsecond=0)
-                              )
+        print("Scheduler running:", cls.scheduler.running)
+        logger.info(f"Scheduler running: {cls.scheduler.running}")
+        register_jobs(cls.scheduler)
+
+        # def keepalive():
+        #     print("keepalive ----------> сработал", flush=True)
+        #     logger.info("Scheduler running: %s", cls.scheduler.running)
+        #     # logger.info("Loop running: %s", asyncio.get_event_loop().is_running())
+        #
+        # cls.scheduler.add_job(keepalive, "interval", seconds=30)
+        # cls.scheduler.add_job(send_message_text_to_user,
+        #                       "date",
+        #                       run_date=datetime.now(cls.tz) + timedelta(minutes=5),
+        #                       kwargs={
+        #                           "uuid": settings.MAIN_ADMIN,
+        #                           "text": "Привет",
+        #                       },
+        #                       misfire_grace_time=3600,
+        #                       )
+        #
+        # job = cls.scheduler.add_job(send_message_io_and_mio_moglie,
+        #                             "date",
+        #                             run_date=((datetime.now(cls.tz) + timedelta(days=1)).replace(
+        #                                 hour=6, minute=00, second=0, microsecond=0)
+        #                             ))
+        # print("Сейчас по Минску:", datetime.now(cls.tz))
+        # print("Сработает в:     ", job.next_run_time)
 
         cls._initialized = True
         logger.info(f"✅ Зависимости инициализированы {'(туннель)' if cls.use_tunnel else '(локально)'}")

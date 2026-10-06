@@ -4,12 +4,13 @@ from aiogram import Router, F, flags, types
 from aiogram.enums import ChatAction
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
 
 from config import bot
 from core.config import settings
 from database.admin_crud import get_user_all, set_role, export_users_to_excel, get_personal_record_short
+from keyboards.inline_keyboard import create_i_kb_from_dict
 from services.personal_record import get_personal_record_short_lines, get_personal_record_short_lines_render
 from database.dao.personal_record_repository import PersonalRecordDAO
 from database.users_crud import get_user_by_uuid
@@ -96,6 +97,24 @@ async def set_role_to_admin(message: Message, state: FSMContext):
     else:
         await message.answer(
             text=f"Что то не так в UUID = {message.text}, такого пользователя нет.\n Попробуйте снова.")
+
+
+@router.message(Command(commands="test"), IsAdmin())
+async def test(message: Message):
+    data = {
+        "/test11": "/test12",
+        "/test2": "/test2"
+    }
+    kbd = create_i_kb_from_dict(data=data, adjust=2)
+    await message.answer(text="Админские дела", reply_markup=kbd)
+
+    pass
+
+@router.callback_query(F.data == "/test11", IsAdmin())
+async def callback_text_1(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer(text="dddddddddcdcsdcdscdcscdcdss")
+    await callback.message.answer(text="нажали test1")
 
 
 # рабочий

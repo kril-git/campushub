@@ -3,7 +3,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import connection
-from database.dao.dao import PoolDAO
+from database.dao.pool_dao import PoolDAO
 from models import Base
 
 

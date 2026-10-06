@@ -23,8 +23,8 @@ async def main():
     setup_logging()
 
     # 1. Инициализируем зависимости (один раз)
-    if settings.USE_TUNNEL:
-        await AppDependencies.initialize()
+    # if settings.USE_TUNNEL:
+    await AppDependencies.initialize()
     dp = Dispatcher(
         storage=AppDependencies.storage,
         events_isolation=SimpleEventIsolation(),

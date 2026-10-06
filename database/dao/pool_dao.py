@@ -10,7 +10,7 @@ from services import EnumPools
 from services.EnumPoolAction import PoolAction
 
 
-class PoolDAO(BaseDAO):
+class PoolDAO(BaseDAO[Pool]):
     model = Pool
 
     @classmethod
@@ -46,7 +46,7 @@ class PoolDAO(BaseDAO):
         return result.scalar()
 
 
-class PoolQuestionDAO(BaseDAO):
+class PoolQuestionDAO(BaseDAO[PoolQuestion]):
     model = PoolQuestion
     name_field = "pool_id"
     table_name = "poolquestions"
@@ -73,7 +73,7 @@ class PoolQuestionDAO(BaseDAO):
         return result
 
 
-class PoolAnswerDAO(BaseDAO):
+class PoolAnswerDAO(BaseDAO[PoolAnswer]):
     model = PoolAnswer
 
     @staticmethod
@@ -89,7 +89,7 @@ class PoolAnswerDAO(BaseDAO):
         return result.scalar()
 
 
-class AnswerDAO(BaseDAO):
+class AnswerDAO(BaseDAO[Answer]):
     model = Answer
 
     @classmethod
@@ -106,7 +106,7 @@ class AnswerDAO(BaseDAO):
         return result.mappings().all()
 
 
-class UserPoolDAO(BaseDAO):
+class UserPoolDAO(BaseDAO[UserPool]):
     model = UserPool
 
     @classmethod

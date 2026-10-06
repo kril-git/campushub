@@ -51,3 +51,6 @@ class DatabaseHelper:
 
 
 db_helper = DatabaseHelper()
+
+SessionLocal = db_helper.session_factory
+

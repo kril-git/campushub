@@ -22,19 +22,6 @@ async def get_uuid_str(uuid: str | int) -> str:
         return uuid
 
 
-async def _is_admin(uuid: int | str) -> bool:
-    if isinstance(uuid, int):
-        if str(uuid) in settings.ADMINS:
-            return True
-        else:
-            return False
-    if isinstance(uuid, str):
-        if uuid in settings.ADMINS:
-            return True
-        else:
-            return False
-
-
 # рабочий
 async def get_help_admin(message: Message) -> dict:
     """ Пока бот говорит только по-русски """

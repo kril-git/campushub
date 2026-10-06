@@ -6,7 +6,7 @@ from sqlalchemy import select, Result, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import connection
 # from database.dao.base_repository import BaseRepository
-from database.dao.dao import PoolDAO, PoolQuestionDAO, PoolAnswerDAO, AnswerDAO, UserPoolDAO
+from database.dao.pool_dao import PoolDAO, PoolQuestionDAO, PoolAnswerDAO, AnswerDAO, UserPoolDAO
 from models.pool import Pool, PoolQuestion, PoolAnswer, Answer, UserPool
 from services import EnumPools
 from services.EnumPoolAction import PoolAction
@@ -53,6 +53,43 @@ logger = logging.getLogger(__name__)
 
 
 class DAOPools:
+
+    # ---------- приватные: принимают сессию, содержат логику ----------
+
+    @staticmethod
+    async def _get_pool_action(session: AsyncSession, pool_category: PoolCategory) -> Pool | None:
+        # async def get_pool(session: AsyncSession, **kwargs) -> Pool:
+        stmt = (select(Pool).where(and_(Pool.pool_category == pool_category,
+                                        Pool.pool_action == PoolAction.ACTION))
+                )
+        result: Result = await session.execute(stmt)
+        # users = await session.scalars(stmt)
+        return result.scalar()
+
+    @staticmethod
+    async def _update_pool_actions(session: AsyncSession, id: int):
+        """
+        Закрывает опрос если дата окончания опроса меньше чем сегодня.
+        """
+        stmt = (
+            update(Pool).where(Pool.id == id).values(pool_action=PoolAction.DELETE, date_update=datetime.now())
+        )
+        result: Result = await session.execute(stmt)
+        await session.commit()
+        return result
+
+    # ---------- публичные: сессия от декоратора ----------
+
+    @staticmethod
+    @connection
+    async def get_pool_action(_session: AsyncSession, pool_category: PoolCategory) -> Pool | None:
+        return await DAOPools._get_pool_action(session=_session, pool_category=pool_category)
+
+    @staticmethod
+    @connection
+    async def update_pool_actions(_session: AsyncSession, id: int):
+        return await DAOPools._update_pool_actions(session=_session, id=id)
+
     @staticmethod
     async def get_pool_id(session: AsyncSession, pool_category: PoolCategory) -> int:
         """Внутренний — session передаётся явно."""
@@ -67,7 +104,7 @@ class DAOPools:
     @staticmethod
     @connection
     async def add_pool_record(session: AsyncSession, data: Pool) -> Any:
-        pool_id = await DAOPools.get_pool_id(          # ← внутренний, без _action
+        pool_id = await DAOPools.get_pool_id(  # ← внутренний, без _action
             session=session,
             pool_category=data.pool_category,
         )
@@ -95,8 +132,6 @@ class DAOPools:
     #     instance = await PoolDAO.add(session=session, data=data)
     #     return instance
 
-
-
     @staticmethod
     @connection
     async def add_pool_question(session: AsyncSession, data: PoolQuestion) -> Any:
@@ -119,11 +154,11 @@ class DAOPools:
         # users = await session.scalars(stmt)
         return result.scalar()
 
-    @staticmethod
-    @connection
-    async def get_by_link_id(session: AsyncSession, link_id: int) -> list:
-        data = await PoolQuestionDAO.get_by_link_id(session=session, link_id=link_id)
-        return data
+    # @staticmethod
+    # @connection
+    # async def get_by_link_id(session: AsyncSession, link_id: int) -> list:
+    #     data = await PoolQuestionDAO.get_by_link_id(session=session, link_id=link_id)
+    #     return data
 
     @staticmethod
     async def create_one_record(data: dict) -> bool:

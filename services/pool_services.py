@@ -1,14 +1,12 @@
-import json
 import logging
 from datetime import datetime
 
 from typing import Any
 
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
 
 from core.config import settings
-from database.dao.pool_repository import DAOPools
+from database.repository.pool_repository import DAOPools
 from models.pool import Pool, PoolQuestion, PoolAnswer
 # from scenes.load_pool_json_scene import logger
 from services.EnumPoolAction import PoolAction
@@ -20,31 +18,6 @@ logger = logging.getLogger(__name__)
 
 def get_passwords() -> list:
     return settings.PASSWORDS.split(",")
-
-
-async def get_data_from_json(message: Message) -> Any:
-    await message.answer(f"Отлично, я получил нужный документ.\n <i>Проверяю его корректность.</i>")
-    try:
-        file_info = await message.bot.get_file(message.document.file_id)
-        downloaded_file = await message.bot.download_file(file_info.file_path)
-        downloaded_file.seek(0)
-        data = json.load(downloaded_file)
-    except Exception as e:
-        logger.error("Проблема структуры файла")
-        await message.answer(text=f"Проблема структуры файла.\n"
-                                  f"Нажмите выход, проверьте файл\n"
-                                  f"и начните заново. /json_pool_load")
-        raise e
-
-    # if data["password"] in get_passwords():
-    #     await message.answer(text=f"👍 Проверка прошла успешно!\n"
-    #                               f"Ожидайте, сохраняю информацию в базе данных\n"
-    #                               f"После завершения отправлю информацию для проверки.\n"
-    #                               f"🎯")
-    return data
-    # else:
-    #     await message.answer(text="👎 Пароль в файле не совпадает с контрольным")
-    #     return None
 
 
 async def create_pool_data():

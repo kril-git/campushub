@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     PATH_FOR_ALL_MEDIA_FILES: str = ""
 
     MAIN_ADMIN: str
+    TEST_USERS: list[str]
     LOCALHOST: str
     PG_PORT: int
     SSH_INT_PORT: int
