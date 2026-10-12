@@ -3,12 +3,23 @@ import logging
 
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError
 from aiogram.types import Message
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from database.connection import readonly
 from database.users_crud import get_user_by_uuid
 from lexicon.lexicon import LEXICON_USER_HELP
 from models import User
+from utils.converters import uuid_to_str
 
 logger = logging.getLogger(__name__)
+
+
+class UserService:
+    @staticmethod
+    @readonly
+    async def is_registered_user(session: AsyncSession, uuid: str | int) -> bool:
+        uuid_str = await uuid_to_str(uuid=uuid)
+        return await UserDao.is_registered(session=session, uuid=uuid_str)  # type: ignore
 
 
 # рабочий

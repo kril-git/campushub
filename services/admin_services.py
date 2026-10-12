@@ -15,12 +15,6 @@ logger = logging.getLogger(__name__)
 # async def send_admin_help(data: dict, message: Message):
 #     pass
 
-async def get_uuid_str(uuid: str | int) -> str:
-    if isinstance(uuid, int):
-        return str(uuid)
-    else:
-        return uuid
-
 
 # рабочий
 async def get_help_admin(message: Message) -> dict:

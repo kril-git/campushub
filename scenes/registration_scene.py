@@ -19,6 +19,7 @@ from keyboards.inline_keyboard import i_get_start_keyboard, i_get_cancel_keyboar
 from keyboards.reply_keyboar import r_get_phone_keyboard
 from lexicon.constants import steps
 from lexicon.lexicon import Lexicon
+from services.personal_record_service import PersonalRecordService
 
 logger = logging.getLogger(__name__)
 router = Router(name=__name__)
@@ -76,13 +77,26 @@ class RegistrationScene(Scene, state="registration_scene"):
             return None
 
     @classmethod
-    async def save_to_database(cls, user_id: int, user_data: dict) -> None:
-        """Сохранение данных в базу данных"""
+    async def save_to_database(cls, user_id: int, user_data: dict) -> bool:
+        """
+        Сохраняет данные регистрации.
+        Возвращает True при успехе, False — при ошибке.
+        Ответ пользователю — в вызывающем коде.
+        """
         try:
-            await save_user_registration(user_data=user_data, uuid=str(user_id))  # type: ignore
-            logger.info(f"✅ Студент {user_id} успешно зарегистрирован")
-        except Exception as e:
-            logger.error(f"Ошибка при сохранении данных: {e}")
+            await PersonalRecordService.save_user_registration(
+                user_data=user_data,
+                uuid=str(user_id),
+            )
+        except ValueError as e:
+            logger.warning("Ошибка валидации у %s: %s", user_id, e)
+            return False
+        except Exception:
+            logger.exception("Не удалось сохранить студента %s", user_id)
+            return False
+
+        logger.info("Студент %s успешно зарегистрирован", user_id)
+        return True
 
     # ============================================================
     # ОТОБРАЖЕНИЕ ШАГА (ЕДИНСТВЕННОЕ МЕСТО ОТПРАВКИ СООБЩЕНИЙ)
@@ -607,15 +621,28 @@ class RegistrationScene(Scene, state="registration_scene"):
                 return  # ✅ Выходим, чтобы не было лишних вызовов
 
             case "confirm_yes":
-                # Сохраняем данные в БД
-                await self.save_to_database(user_id=callback.from_user.id, user_data=user_data)
-
-                await callback.message.edit_text(
-                    "✅ Данные подтверждены!",
-                    reply_markup=None
+                ok = await self.save_to_database(
+                    user_id=callback.from_user.id,
+                    user_data=user_data,
                 )
+                if not ok:
+                    await callback.message.answer(
+                        "❌ Не удалось сохранить данные. Попробуйте позже."
+                    )
+                    return
+
+                await callback.message.edit_text("✅ Данные подтверждены!", reply_markup=None)
                 await state.update_data(step="completed")
                 await self.show_step(callback.message, state)
+                # # Сохраняем данные в БД
+                # await self.save_to_database(user_id=callback.from_user.id, user_data=user_data)
+                #
+                # await callback.message.edit_text(
+                #     "✅ Данные подтверждены!",
+                #     reply_markup=None
+                # )
+                # await state.update_data(step="completed")
+                # await self.show_step(callback.message, state)
 
             case "confirm_no":
                 # ✅ Возвращаем на шаг surname для исправления

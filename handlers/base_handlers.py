@@ -21,7 +21,7 @@ from models import User
 from scenes.settings_scene import SettingsScene
 from services import EnumRoles
 from services.admin_services import get_help_admin
-from services.user_services import send_dict, create_str_from_dict, get_help_user
+from services.user_services import send_dict, create_str_from_dict, get_help_user, UserService
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -32,8 +32,6 @@ logger = logging.getLogger(__name__)
 async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMContext):
     await scenes.close()
     await state.clear()
-    # await set_main_menu(bot=bot, uuid=message.from_user.id)
-
     assert message.from_user is not None
     if not await if_exist_user(uuid=message.from_user.id):  # type: ignore
         await message.answer(Lexicon.get_text(lang="RU", key="one_enter"), reply_markup=ReplyKeyboardRemove())
@@ -60,8 +58,9 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
             given_name = message.from_user.first_name
 
         await message.answer(text=f"Привет, {given_name}. Рад тебя видеть.")
-        await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
-                             reply_markup=ReplyKeyboardRemove())
+        if not UserService.is_registered_user:
+            await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
+                                 reply_markup=ReplyKeyboardRemove())
         await set_main_menu(bot=bot, uuid=message.from_user.id)
 
 

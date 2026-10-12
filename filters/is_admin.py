@@ -14,4 +14,4 @@ class IsAdmin(BaseFilter):
 
 async def is_admin(uuid: int | str) -> bool:
     """Проверяет, является ли пользователь админом."""
-    return str(uuid) in settings.admins
+    return str(uuid) in settings.ADMINS

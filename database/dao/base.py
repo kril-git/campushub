@@ -1,7 +1,7 @@
 import logging
 from typing import Any, ClassVar, Type, TypeVar, Generic, cast
 
-from sqlalchemy import select, delete, and_, update, CursorResult
+from sqlalchemy import select, delete, and_, update, CursorResult, exists
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,12 +81,19 @@ class BaseDAO(Generic[T]):
         await session.commit()
         return result.rowcount  # type: ignore
 
-    @classmethod
-    async def delete_by_user_and_pool(cls, session: AsyncSession, **kwargs):
-        stmt = delete(cls.model).where(and_(cls.model.user_uuid == kwargs["user_uuid"],
-                                            cls.model.pool_id == kwargs["pool_id"]))
-        await session.execute(stmt)
-        await session.commit()
+    # @classmethod
+    # async def delete_by_user_and_pool(cls, session: AsyncSession, **kwargs):
+    #     stmt = delete(cls.model).where(and_(cls.model.user_uuid == kwargs["user_uuid"],
+    #                                         cls.model.pool_id == kwargs["pool_id"]))
+    #     await session.execute(stmt)
+    #     await session.commit()
+
+    # @classmethod
+    # async def exists_by_uuid(cls, session: AsyncSession, uuid: str) -> bool:
+    #     stmt = select(
+    #         exists().where(cls.model.uuid == uuid)
+    #     )
+    #     return bool(await session.scalar(stmt))
 
     # @classmethod
     # async def get_by_link_id(cls, session: AsyncSession, **kwargs) -> list[Any]:

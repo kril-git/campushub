@@ -25,6 +25,7 @@ class LanguageTexts:
     brsm: str
     cas: str
 
+
 class Lexicon:
     # Использование:
     # LEXICON.RU.start  # "🎓 Добро пожаловать..."
@@ -59,6 +60,7 @@ class Lexicon:
         brsm="Являешься членом ПО ООО БРСМ?  ответ в формате (да или нет)",
         cas="Ты пострадавший от ЧАЭС ? ответ в формате (да или нет)",
     )
+
     # EN: LanguageTexts = LanguageTexts(
     #     start="🎓 Welcome to the registration system!\n\n",
     #     surname="Введите вашу Фамилию:",

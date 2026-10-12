@@ -7,10 +7,10 @@ from sqlalchemy.exc import ProgrammingError, NoSuchTableError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from database.connection import connection
+from database.connection import connection, readonly
 from models import User, PersonalRecordCard
 from services.EnumRoles import Roles
-from services.admin_services import get_uuid_str
+from utils.converters import uuid_to_str
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,15 @@ async def create_new_user(session: AsyncSession, user: User) -> User:
     await session.commit()
     return user
 
+@readonly
+async def is_registered_user(session: AsyncSession, uuid: str | int) -> bool:
+    uuid_str = await uuid_to_str(uuid=uuid)
+    await is_registered(session=session, uuid=uuid_str)
+
 
 @connection
 async def get_user_by_uuid(session: AsyncSession, uuid: str | int) -> User:
-    uuid_str = await get_uuid_str(uuid=uuid)
+    uuid_str = await uuid_to_str(uuid=uuid)
     stmt = select(User).where(User.uuid == uuid_str)
     result: Result = await session.execute(stmt)
     user: User = result.scalar()
@@ -72,7 +77,7 @@ async def get_given_name_by_uuid(session: AsyncSession, uuid: str | int) -> str 
     Returns:
         str | None: given_name или None, если не найден
     """
-    uuid_str = await get_uuid_str(uuid=uuid)
+    uuid_str = await uuid_to_str(uuid=uuid)
     stmt = select(PersonalRecordCard.given_name).where(PersonalRecordCard.uuid == uuid_str)
     result: Result = await session.execute(stmt)
     given_name: str | None = result.scalar()

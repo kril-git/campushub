@@ -6,11 +6,11 @@ from typing import Any
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.connection import connection
+from database.connection import connection, readonly
 
 from core.config import settings
-from database.dao.pool_dao import DAOPools, PoolDAO, PoolQuestionDAO, PoolAnswerDAO
-from models.pool import Pool, PoolQuestion, PoolAnswer
+from database.dao.pool_dao import DAOPools, PoolDAO, PoolQuestionDAO, PoolAnswerDAO, UserPoolDAO, AnswerDAO
+from models.pool import Pool, PoolQuestion, PoolAnswer, Answer, UserPool
 # from scenes.load_pool_json_scene import logger
 from services.EnumPoolAction import PoolAction
 from services.EnumPools import PoolCategory
@@ -65,9 +65,90 @@ class PoolService:
             await PoolAnswerDAO.add_many(session=session, data=answers)
         return pool_record.id
 
+    @staticmethod
+    @readonly
+    async def get_active_pool_id(session: AsyncSession, pool_category: PoolCategory) -> int | None:
+        return await PoolDAO.get_id_action(session, pool_category)
+
+    @staticmethod
+    @readonly
+    async def check_survey_completion(session: AsyncSession, **kwargs) -> bool:
+        """
+        Вернет False если пользователь не проходил опрос
+        """
+        if await UserPoolDAO.get_check_survey_completion(session=session, **kwargs) is None:
+            return False
+        else:
+            return True
+
+    @staticmethod
+    @connection
+    async def delete_user_pool(session: AsyncSession, **kwargs):
+        await UserPoolDAO.delete_by_user_and_pool(session=session,
+                                                  user_uuid=kwargs["user_uuid"],
+                                                  pool_id=kwargs["pool_id"])
+        await AnswerDAO.delete_by_user_and_pool(session=session,
+                                                user_uuid=kwargs["user_uuid"],
+                                                pool_id=kwargs["pool_id"])
+
+    @staticmethod
+    @readonly
+    async def get_object_pool(session: AsyncSession, id_pool: int) -> Pool:
+        data = await PoolDAO.get_object_pool(session=session, id_pool=id_pool)
+        return data
+
+    @staticmethod
+    @readonly
+    async def get_count_questions(session: AsyncSession, pool_id: int) -> int:
+        data = await PoolQuestionDAO.get_count_questions(session=session, pool_id=pool_id)
+        return data
+
+    @staticmethod
+    @connection
+    async def get_object_pool_answer_by_id(session: AsyncSession, answer_id: int) -> PoolAnswer:
+        data = await PoolAnswerDAO.get_object_pool_answer_by_id(session=session, answer_id=answer_id)
+        return data
+
+    @staticmethod
+    @connection
+    async def add_user_answer(session: AsyncSession, data: list[Answer]) -> Any:
+        instance = await AnswerDAO.add_many(session=session, data=data)
+        return instance
+
+    @staticmethod
+    @connection
+    async def add_user_pools_record(session: AsyncSession, data: UserPool) -> UserPool:
+        instance = await UserPoolDAO.add(session=session, data=data)
+        return instance
+
+    @staticmethod
+    @connection
+    async def get_object_pool_question_by_pool_id_and_number_q(session: AsyncSession, pool_id: int,
+                                                               number_q: int) -> PoolQuestion:
+        data = await PoolQuestionDAO.get_object_pool_question_by_pool_id_and_number_q(session=session, pool_id=pool_id,
+                                                                                      number_q=number_q)
+        return data
+
+    @staticmethod
+    @connection
+    async def get_object_pool_answer_by_question_id(session: AsyncSession, question_id: int) -> list[PoolAnswer]:
+        data = await PoolAnswerDAO.get_object_pool_answer_by_question_id(session=session, question_id=question_id)
+        return list(data)
+
+    @staticmethod
+    @connection
+    async def finish_survey(
+            session: AsyncSession,
+            answers: list[Answer],
+            user_pool: UserPool,
+    ) -> None:
+        await AnswerDAO.add_many(session, answers)
+        await UserPoolDAO.add(session, user_pool)
+        # commit сделает @connection — один на всё
+
 
 async def get_info_pool(pool_id: int) -> str:
-    pool = await DAOPools.get_object_pool(id_pool=pool_id)
+    pool = await PoolService.get_object_pool(id_pool=pool_id)
     list_info = [f"Название опроса: {pool.pool_description}\n", f"Категория: {pool.pool_category.name}\n\n"]
 
     questions = await DAOPools.get_object_pool_question_by_pool_id(pool_id=pool.id)

@@ -7,8 +7,9 @@ from apscheduler.triggers.cron import CronTrigger
 
 from config import settings
 # from core.dependencies import AppDependencies
-from database.dao.pool_dao import DAOPools
+from database.dao.pool_dao import DAOPools, PoolDAO
 from services.EnumPools import PoolCategory
+from services.pool_service import PoolService
 from services.sending_service import send_message_text_to_user
 
 logger = logging.getLogger(__name__)
@@ -107,36 +108,38 @@ async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> 
     logger.info("🔔 daily_pool_job start")
 
     #     Получаем активный пул если существует
-    active_pool = await DAOPools.get_pool_action(pool_category=PoolCategory.NONE)
+    active_pool = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
     if active_pool is None:
         print("skjcdbaksdnckajsnckjasnckjsadncakjnckjcnkjanc")
         return
 
     if uuid is not None:
-        print(f" Дата рула ---------- {active_pool.end_date.strftime("%d-%m-%Y")}")
+        print(f" Дата рула ---------- ")
         print(datetime.now().date())
         for user in uuid:
             await send_message_text_to_user(uuid=str(user), text=text)
-    if active_pool.end_date < datetime.today().date():
-        logger.info(f"Опрос {active_pool.id} закрываем")
-        await DAOPools.update_pool_actions(id=active_pool.id)
+    # if active_pool.end_date < datetime.today().date():
+    #     logger.info(f"Опрос {active_pool.id} закрываем")
+    #     # await DAOPools.update_pool_actions(id=active_pool.id)
+    # else:
+    #     logger.info(f"Опроса для закрытия нет {active_pool}")
 
-    print(active_pool)
+    # print(active_pool)
 
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
     """Регистрация всех периодических задач. Вызывать один раз при старте."""
-    scheduler.add_job(
-        daily_pool_job,
-        trigger=CronTrigger(hour=9, minute=0),  # каждый день 09:00 Europe/Minsk
-        id="daily_pool_job",
-        replace_existing=True,
-        misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
-        coalesce=True,  # не запускать 10 раз подряд после простоя
-        max_instances=1,  # не пересекать запуски
-    )
-
-    logger.info("✅ daily_pool_job зарегистрирован (cron 09:00 Europe/Minsk)")
+    # scheduler.add_job(
+    #     daily_pool_job,
+    #     trigger=CronTrigger(hour=9, minute=0),  # каждый день 09:00 Europe/Minsk
+    #     id="daily_pool_job",
+    #     replace_existing=True,
+    #     misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
+    #     coalesce=True,  # не запускать 10 раз подряд после простоя
+    #     max_instances=1,  # не пересекать запуски
+    # )
+    #
+    # logger.info("✅ daily_pool_job зарегистрирован (cron 09:00 Europe/Minsk)")
 
     scheduler.add_job(daily_pool_test_job,
                       "date",
