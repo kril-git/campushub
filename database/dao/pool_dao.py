@@ -16,7 +16,7 @@ class PoolDAO(BaseDAO[Pool]):
     model = Pool
 
     @classmethod
-    async def add_pool_record(cls, session: AsyncSession, data: Pool) -> Pool:
+    async def add_pool_record(cls, session: AsyncSession, data: Pool) -> model:
         pool_id = await cls.get_id_action(
             session=session,
             pool_category=data.pool_category,
@@ -61,6 +61,15 @@ class PoolDAO(BaseDAO[Pool]):
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    @classmethod
+    async def get_pool_id_by_date_end_now(cls, session: AsyncSession,
+                                          pool_category: PoolCategory = PoolCategory.NONE) -> int | None:
+        stmt = select(cls.model.id).where(cls.model.pool_action == PoolAction.ACTION,
+                                          cls.model.pool_category == pool_category,
+                                          cls.model.end_date == datetime.now().date())
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
 
 class PoolQuestionDAO(BaseDAO[PoolQuestion]):
     model = PoolQuestion
@@ -69,9 +78,15 @@ class PoolQuestionDAO(BaseDAO[PoolQuestion]):
     async def add_pool_question(cls, session: AsyncSession, data: PoolQuestion) -> PoolQuestion:
         return await cls.add(session=session, data=data)
 
-    @staticmethod
-    async def get_object_pool_question_by_pool_id(session: AsyncSession, pool_id: int) -> Sequence[PoolQuestion]:
-        stmt = select(PoolQuestion).where(PoolQuestion.pool_id == pool_id)
+    # @staticmethod
+    # async def get_object_pool_question_by_pool_id(session: AsyncSession, pool_id: int) -> Sequence[PoolQuestion]:
+    #     stmt = select(PoolQuestion).where(PoolQuestion.pool_id == pool_id)
+    #     result = await session.execute(stmt)
+    #     return result.scalars().all()
+
+    @classmethod
+    async def get_object_pool_question_by_pool_id(cls, session: AsyncSession, pool_id: int) -> Sequence[model]:
+        stmt = select(cls.model).where(cls.model.pool_id == pool_id)
         result = await session.execute(stmt)
         return result.scalars().all()
 

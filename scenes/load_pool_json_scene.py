@@ -127,7 +127,7 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
         else:
             await message.answer(text=f"Проверка файла прошла успешно 👍.\n"
                                       f"Название файла {message.document.file_name},"
-                                      f"Записываю данные в базу данных...")
+                                      f"Записываю данные в базу данных...", reply_markup=None)
             try:
                 pool_id = await PoolService.create_pool(data)
             except Exception:

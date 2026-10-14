@@ -116,7 +116,7 @@ LEXICON_ADMIN_HELP: dict[str, dict[str, str]] = {
         "/create_pool": "создать опрос",
         "/complete_a_survey": "Пройти опрос",
         "/get_person_data_short": "Показать персональные данные короткие",
-
+        "/_campushub_test_": "Инлайн клавиатура тестовых заданий",
     },
     "EN": {
         "/create_admin": "create admin",
@@ -124,6 +124,12 @@ LEXICON_ADMIN_HELP: dict[str, dict[str, str]] = {
         # "/json_pool_load": "pool file load",
         # "/complete_a_survey": "go",
     }
+}
+
+LEXICON_ADMIN_TEST: dict[str, str] = {
+
+    "_campushub_test_active_pool_": "Активный пул",
+    "/test2": "/test2"
 }
 
 LEXICON_USER_HELP: dict[str, dict[str, str]] = {

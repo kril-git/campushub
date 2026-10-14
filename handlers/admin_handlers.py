@@ -11,6 +11,7 @@ from config import bot
 from core.config import settings
 from database.admin_crud import get_user_all, set_role, export_users_to_excel, get_personal_record_short
 from keyboards.inline_keyboard import create_i_kb_from_dict
+from lexicon.lexicon import LEXICON_ADMIN_TEST
 from services.personal_record_service import get_personal_record_short_lines, get_personal_record_short_lines_render
 from database.dao.personal_record_dao import PersonalRecordDAO
 from database.users_crud import get_user_by_uuid
@@ -110,11 +111,18 @@ async def test(message: Message):
 
     pass
 
+
 @router.callback_query(F.data == "/test11", IsAdmin())
 async def callback_text_1(callback: CallbackQuery):
     await callback.message.delete()
     await callback.answer(text="dddddddddcdcsdcdscdcscdcdss")
     await callback.message.answer(text="нажали test1")
+
+
+@router.message(Command(commands="_campushub_test_"), IsAdmin())
+async def test(message: Message):
+    kbd = create_i_kb_from_dict(data=LEXICON_ADMIN_TEST, adjust=1)
+    await message.answer(text="Доступные тесты.", reply_markup=kbd)
 
 
 # рабочий

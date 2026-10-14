@@ -1,33 +1,23 @@
-# import logging
-# from aiogram import Router, F, flags
-# from aiogram.enums import ChatAction
-# from aiogram.filters import CommandStart, Command
-# from aiogram.fsm.context import FSMContext
-# from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
-# from aiogram.utils.chat_action import ChatActionSender
-#
-# from config import bot
-# from database.admin_crud import set_role, get_user_all
-# from database.users_crud import if_exist_user, create_new_user, update_last_visit
-# from filters.is_admin import IsAdmin
-# from filters.states_is_not_none import IsNotNoneStates
-# from keyboards.inline_keyboard import i_kb_yes_or_no
-# from keyboards.reply_keyboar import r_kb_cancel, r_kb_accounting
-# from models import User
-# from services.admin_services import send_users_list, send_users_list_4096
-# from states.admin_states import FSMSetUserToAdmin
-# from states.products_states import FSMProducts
-# from config.constants import product_sep, product_template
-#
-# router = Router(name=__name__)
-# logger = logging.getLogger(__name__)
-#
-#
-# # @router.message(Command(commands="products"))
-# # async def create_menu_accounting(message: Message, state: FSMContext):
-# #     await state.set_state(FSMProducts.products)
-# #     await message.answer(text="Перешли в раздел управления ассортиментом.", reply_markup=r_kb_accounting)
-#
+import logging
+
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery
+
+from core.config import settings
+from filters.is_admin import IsAdmin
+from services.scheduled_jobs import daily_pool_test_job
+
+router = Router(name=__name__)
+logger = logging.getLogger(__name__)
+
+
+@router.callback_query(F.data == "_campushub_test_active_pool_", IsAdmin())
+async def create_menu_accounting(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.delete()
+    await callback.message.answer(f"Пришли в _campushub_test_active_pool_")
+    await daily_pool_test_job(uuid=settings.TEST_USERS, text="Вызов из тестового калбэка")
+
 #
 # @router.message(F.text.lower().contains("добавить".lower()), FSMProducts.products)
 # async def add_product(message: Message, state: FSMContext):

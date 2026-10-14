@@ -6,6 +6,7 @@ from aiogram.fsm.scene import Scene
 
 from handlers.base_handlers import router as echo_router
 from handlers.admin_handlers import router as admin_router
+from handlers.test_handlers import router as test_router
 # from handlers.set_user_to_admin_handler import router as set_user_to_admin_handler
 # from handlers.main_commands_handlers import router as main_commands_handlers
 # from handlers.accounting_handlers import router as accounting_router
@@ -51,8 +52,9 @@ router = Router(name=__name__)
 #     return router_s
 
 
-router.include_router(
+router.include_routers(
     admin_router,
+    test_router,
     # registration_router,
     # broadcast_text_router,
     # echo_router,

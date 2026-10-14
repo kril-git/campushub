@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from typing import Any
+from typing import Any, Sequence
 
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +69,11 @@ class PoolService:
     @readonly
     async def get_active_pool_id(session: AsyncSession, pool_category: PoolCategory) -> int | None:
         return await PoolDAO.get_id_action(session, pool_category)
+
+    @staticmethod
+    @readonly
+    async def get_active_pool_end_date(session: AsyncSession, pool_category: PoolCategory) -> datetime | None:
+        return await PoolDAO.get_pool_id_by_date_end_now(session, pool_category)
 
     @staticmethod
     @readonly
@@ -146,15 +151,29 @@ class PoolService:
         await UserPoolDAO.add(session, user_pool)
         # commit сделает @connection — один на всё
 
+    @staticmethod
+    @connection
+    async def mark_as_deleted_pool(session: AsyncSession, pool_id: int) -> None:
+        await PoolDAO.mark_as_deleted(session=session, pool_id=pool_id)
+
+    @staticmethod
+    @readonly
+    async def get_object_pool_question_by_pool_id(session: AsyncSession, pool_id: int) -> Sequence[PoolQuestion]:
+        return await PoolQuestionDAO.get_object_pool_question_by_pool_id(session=session, pool_id=pool_id)
+
+    @staticmethod
+    @readonly
+    async def get_object_pool_answer_by_question_id(session: AsyncSession, question_id: int) -> Sequence[PoolQuestion]:
+        return await PoolAnswerDAO.get_object_pool_answer_by_question_id(session=session, question_id=question_id)
 
 async def get_info_pool(pool_id: int) -> str:
     pool = await PoolService.get_object_pool(id_pool=pool_id)
     list_info = [f"Название опроса: {pool.pool_description}\n", f"Категория: {pool.pool_category.name}\n\n"]
 
-    questions = await DAOPools.get_object_pool_question_by_pool_id(pool_id=pool.id)
+    questions = await PoolService.get_object_pool_question_by_pool_id(pool_id=pool.id)
     for item in questions:
         list_info.append(f"   {item.question_number}. {item.pool_question}\n")
-        answers = await DAOPools.get_object_pool_answer_by_question_id(question_id=item.id)
+        answers = await PoolService.get_object_pool_answer_by_question_id(question_id=item.id)
         for answer in answers:
             list_info.append(f"{answer.pool_answer}\n")
         list_info.append(f"----------\n")

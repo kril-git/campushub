@@ -109,11 +109,19 @@ async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> 
 
     #     Получаем активный пул если существует
     active_pool = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
+    active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
+    if active_pool_id is None:
+        print(f"Пула для удаления нету {active_pool_id}")
+        return
+    else:
+        print(f"пул для удаления {active_pool_id}")
+        await PoolService.mark_as_deleted_pool(pool_id=active_pool_id)
     if active_pool is None:
         print("skjcdbaksdnckajsnckjasnckjsadncakjnckjcnkjanc")
         return
 
     if uuid is not None:
+
         print(f" Дата рула ---------- ")
         print(datetime.now().date())
         for user in uuid:
