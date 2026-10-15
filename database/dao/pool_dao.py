@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from typing import Sequence, Any, cast
 
-from sqlalchemy import select, Result, update, and_, func, RowMapping, delete, CursorResult
+from sqlalchemy import select, Result, update, and_, func, RowMapping, delete, CursorResult, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import connection
@@ -27,13 +27,37 @@ class PoolDAO(BaseDAO[Pool]):
 
     @classmethod
     async def get_id_action(cls, session: AsyncSession, pool_category: EnumPools) -> int | None:
+        today = date.today()
         stmt = (
             select(cls.model.id).where(and_(cls.model.pool_action == PoolAction.ACTION,
-                                            cls.model.pool_category == pool_category))
+                                            cls.model.pool_category == pool_category,
+                                            func.cast(cls.model.start_date, Date) <= today),
+                                            func.cast(cls.model.end_date, Date) >= today
+                                            ).limit(1)
         )
         result = await session.execute(stmt)
         id_pool = result.scalar()
         return id_pool
+
+    @classmethod
+    async def has_intersecting_pool(cls,
+                                    session: AsyncSession,
+                                    start: date,
+                                    end: date,
+                                    pool_category: EnumPools = PoolCategory.NONE,) -> bool:
+        stmt = (
+            select(cls.model)
+            .where(
+                # Если даты в БД хранятся как DateTime, приводим их к Date для точного сравнения дней
+                func.cast(cls.model.start_date, Date) < end,
+                            func.cast(cls.model.end_date, Date) > start,
+                            cls.model.pool_action == PoolAction.ACTION,
+                            cls.model.pool_category == pool_category
+            )
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.first() is not None
 
     @classmethod
     async def get_uuid_action(cls, session: AsyncSession, pool_category: EnumPools) -> str | None:
@@ -50,10 +74,10 @@ class PoolDAO(BaseDAO[Pool]):
             update(cls.model)
             .where(cls.model.id == pool_id)
             .values(pool_action=PoolAction.DELETE, date_update=datetime.now())
+            .returning(cls.model.id)
         )
         raw_result: Result = await session.execute(stmt)
-        result = cast(CursorResult, raw_result)
-        return result.rowcount() > 0
+        return raw_result.scalar_one_or_none() is not None
 
     @classmethod
     async def get_object_pool(cls, session: AsyncSession, id_pool: int) -> Pool | None:
@@ -63,11 +87,11 @@ class PoolDAO(BaseDAO[Pool]):
         return result.scalar_one_or_none()
 
     @classmethod
-    async def get_pool_id_by_date_end_now(cls, session: AsyncSession,
-                                          pool_category: PoolCategory = PoolCategory.NONE) -> int | None:
+    async def get_pool_id_by_date_end_now_yesterday(cls, session: AsyncSession,
+                                                    pool_category: PoolCategory = PoolCategory.NONE) -> int | None:
         stmt = select(cls.model.id).where(cls.model.pool_action == PoolAction.ACTION,
                                           cls.model.pool_category == pool_category,
-                                          cls.model.end_date == datetime.now().date())
+                                          cls.model.end_date + timedelta(days=1) == datetime.now().date())
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 

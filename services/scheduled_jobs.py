@@ -98,20 +98,40 @@ async def daily_pool_job(test_users: list[int] | None = None) -> None:
 #     stmt = select(User.id)  # или User.telegram_id — что у вас
 #     return [row[0] for row in (await session.execute(stmt)).all()]
 
-async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> None:
-    """
-    Ежедневная задача 09:00 по Минску.
+# async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> None:
+#     """
+#     Ежедневная задача 09:00 по Минску.
+#
+#     test_users=None  → боевой режим, рассылка всем пользователям
+#     test_users=[...] → тестовый режим, только этим ID
+#     """
+#     logger.info("🔔 daily_pool_job start")
+#
+#     #     Получаем активный пул если существует
+#     # active_pool = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
+#     active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
+#     if active_pool_id is None:
+#         await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"Пула для удаления нет")
+#         return
+#     else:
+#         await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"пул для удаления ID =  {active_pool_id}")
+#         if await PoolService.mark_as_deleted_pool(pool_id=active_pool_id):
+#             await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
+#                                             text=f"пул ID =  {active_pool_id}, успешно помечен как не активный"
+#                                             )
 
-    test_users=None  → боевой режим, рассылка всем пользователям
-    test_users=[...] → тестовый режим, только этим ID
-    """
-    logger.info("🔔 daily_pool_job start")
 
-    #     Получаем активный пул если существует
-    active_pool = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
-    active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
+async def mark_as_deleted_pool_job() -> None:
+    """
+        Ежедневная задача 0:01 по Минску.
+
+        Проверяет активный опрос и помечает его как оконченный если дата окончания опроса вчера
+
+    """
+    logger.info("🔔 mark_as_deleted_pool_job start")
+    active_pool_id = await PoolService.get_active_pool_end_date_yesterday(pool_category=PoolCategory.NONE)
     if active_pool_id is None:
-        await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"Пула для удаления нету")
+        await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"Пула для удаления нет")
         return
     else:
         await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"пул для удаления ID =  {active_pool_id}")
@@ -120,33 +140,26 @@ async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> 
                                             text=f"пул ID =  {active_pool_id}, успешно помечен как не активный"
                                             )
 
-    if uuid is not None:
-
-        print(f" Дата рула ---------- ")
-        print(datetime.now().date())
-        for user in uuid:
-            await send_message_text_to_user(uuid=str(user), text=text)
-
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
     """Регистрация всех периодических задач. Вызывать один раз при старте."""
-    # scheduler.add_job(
-    #     daily_pool_job,
-    #     trigger=CronTrigger(hour=9, minute=0),  # каждый день 09:00 Europe/Minsk
-    #     id="daily_pool_job",
-    #     replace_existing=True,
-    #     misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
-    #     coalesce=True,  # не запускать 10 раз подряд после простоя
-    #     max_instances=1,  # не пересекать запуски
-    # )
-    #
-    # logger.info("✅ daily_pool_job зарегистрирован (cron 09:00 Europe/Minsk)")
+    scheduler.add_job(
+        mark_as_deleted_pool_job,
+        trigger=CronTrigger(hour=0, minute=1),  # каждый день 0:01 Europe/Minsk
+        id="mark_as_deleted_pool_job",
+        replace_existing=True,
+        misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
+        coalesce=True,  # не запускать 10 раз подряд после простоя
+        max_instances=1,  # не пересекать запуски
+    )
 
-    scheduler.add_job(daily_pool_test_job,
-                      "date",
-                      run_date=datetime.now() + timedelta(minutes=1),
-                      kwargs={
-                          "uuid": settings.TEST_USERS,
-                          "text": "Проверка выполнения задания по рассписани, сообщение только админам",
-                      },
-                      )
+    logger.info("✅ mark_as_deleted_pool_job зарегистрирован (cron 0:01 Europe/Minsk)")
+
+    # scheduler.add_job(daily_pool_test_job,
+    #                   "date",
+    #                   run_date=datetime.now() + timedelta(minutes=1),
+    #                   kwargs={
+    #                       "uuid": settings.TEST_USERS,
+    #                       "text": "Проверка выполнения задания по рассписани, сообщение только админам",
+    #                   },
+    #                   )

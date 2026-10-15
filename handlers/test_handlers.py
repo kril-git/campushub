@@ -5,7 +5,9 @@ from aiogram.types import Message, CallbackQuery
 
 from core.config import settings
 from filters.is_admin import IsAdmin
-from services.scheduled_jobs import daily_pool_test_job
+from services.EnumPools import PoolCategory
+from services.pool_service import PoolService
+from services.scheduled_jobs import mark_as_deleted_pool_job
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -16,7 +18,16 @@ async def create_menu_accounting(callback: CallbackQuery):
     await callback.answer()
     await callback.message.delete()
     await callback.message.answer(f"Пришли в _campushub_test_active_pool_")
-    await daily_pool_test_job(uuid=settings.TEST_USERS, text="Вызов из тестового калбэка")
+    await mark_as_deleted_pool_job()
+
+
+@router.callback_query(F.data == "_get_active_pool_id_", IsAdmin())
+async def get_active_pool_id(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.delete()
+    await callback.message.answer(f"Пришли в _get_active_pool_id_")
+    pool_id = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
+    await callback.message.answer(f"Активный опрос ID = {pool_id}")
 
 #
 # @router.message(F.text.lower().contains("добавить".lower()), FSMProducts.products)

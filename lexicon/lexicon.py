@@ -129,7 +129,7 @@ LEXICON_ADMIN_HELP: dict[str, dict[str, str]] = {
 LEXICON_ADMIN_TEST: dict[str, str] = {
 
     "_campushub_test_active_pool_": "Активный пул",
-    "/test2": "/test2"
+    "_get_active_pool_id_": "Активный опрос ID",
 }
 
 LEXICON_USER_HELP: dict[str, dict[str, str]] = {

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Sequence
 
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import connection, readonly
@@ -72,8 +73,13 @@ class PoolService:
 
     @staticmethod
     @readonly
-    async def get_active_pool_end_date(session: AsyncSession, pool_category: PoolCategory) -> datetime | None:
-        return await PoolDAO.get_pool_id_by_date_end_now(session, pool_category)
+    async def has_intersecting_pool(session: AsyncSession, start: Date, end: Date) -> bool:
+        return await PoolDAO.has_intersecting_pool(session=session, start=start, end=end)
+
+    @staticmethod
+    @readonly
+    async def get_active_pool_end_date_yesterday(session: AsyncSession, pool_category: PoolCategory) -> datetime | None:
+        return await PoolDAO.get_pool_id_by_date_end_now_yesterday(session, pool_category)
 
     @staticmethod
     @readonly
@@ -166,9 +172,15 @@ class PoolService:
     async def get_object_pool_answer_by_question_id(session: AsyncSession, question_id: int) -> Sequence[PoolQuestion]:
         return await PoolAnswerDAO.get_object_pool_answer_by_question_id(session=session, question_id=question_id)
 
+
 async def get_info_pool(pool_id: int) -> str:
     pool = await PoolService.get_object_pool(id_pool=pool_id)
-    list_info = [f"Название опроса: {pool.pool_description}\n", f"Категория: {pool.pool_category.name}\n\n"]
+    list_info = [f"Название опроса: {pool.pool_description}\n",
+                 f"Категория: {pool.pool_category.name}\n",
+                 f"Дата начала: {pool.start_date}\n",
+                 f"Дата окончания: {pool.end_date}\n",
+                 f"------------------\n\n"
+                 ]
 
     questions = await PoolService.get_object_pool_question_by_pool_id(pool_id=pool.id)
     for item in questions:

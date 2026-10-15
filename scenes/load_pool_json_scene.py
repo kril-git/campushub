@@ -116,14 +116,28 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
             logger.error("Пароль в файле не соответствует")
             return
 
-        elif datetime.strptime(data.get("start_date"), "%d.%m.%Y").date() < date.today():
-            await message.answer(text=f"Дата начала опроса меньше текущей, проверьте дату")
+        try:
+            start_date = datetime.strptime(data.get("start_date"), "%d.%m.%Y").date()
+            end_date = datetime.strptime(data.get("end_date"), "%d.%m.%Y").date()
+        except (ValueError, TypeError):
+            await message.answer("Некорректный формат дат в JSON. Ожидается ДД.ММ.ГГГГ")
             return
-        elif (datetime.strptime(data.get("end_date"), "%d.%m.%Y").date() <= date.today()
-              or datetime.strptime(data.get("start_date"), "%d.%m.%Y").date() >= datetime.strptime(data.get("end_date"),
-                                                                                                   "%d.%m.%Y").date()):
-            await message.answer(text="Проверьте дату окончания опроса она не корректна.")
+
+        if start_date < date.today():
+            await message.answer(text="Дата начала опроса меньше текущей, проверьте дату")
             return
+
+        if end_date <= date.today() or start_date >= end_date:
+            await message.answer(text="Проверьте дату окончания опроса, она некорректна.")
+            return
+        if await PoolService.has_intersecting_pool(start=start_date, end=end_date):
+            await message.answer(
+                text=f"❌ Ошибка! На указанный период ({data.get('start_date')} — {data.get('end_date')}) "
+                     f"уже запланирован другой опрос. Опросы не должны пересекаться."
+            )
+            logger.warning("Попытка создать пересекающийся опрос на даты %s - %s", start_date, end_date)
+            return
+
         else:
             await message.answer(text=f"Проверка файла прошла успешно 👍.\n"
                                       f"Название файла {message.document.file_name},"
