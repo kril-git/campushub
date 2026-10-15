@@ -153,8 +153,8 @@ class PoolService:
 
     @staticmethod
     @connection
-    async def mark_as_deleted_pool(session: AsyncSession, pool_id: int) -> None:
-        await PoolDAO.mark_as_deleted(session=session, pool_id=pool_id)
+    async def mark_as_deleted_pool(session: AsyncSession, pool_id: int) -> bool:
+        return await PoolDAO.mark_as_deleted(session=session, pool_id=pool_id)
 
     @staticmethod
     @readonly

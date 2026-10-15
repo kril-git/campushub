@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Sequence, Any
+from typing import Sequence, Any, cast
 
-from sqlalchemy import select, Result, update, and_, func, RowMapping, delete
+from sqlalchemy import select, Result, update, and_, func, RowMapping, delete, CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import connection
@@ -45,14 +45,15 @@ class PoolDAO(BaseDAO[Pool]):
         return uuid_pool
 
     @classmethod
-    async def mark_as_deleted(cls, session: AsyncSession, pool_id: int):
+    async def mark_as_deleted(cls, session: AsyncSession, pool_id: int) -> bool:
         stmt = (
             update(cls.model)
             .where(cls.model.id == pool_id)
             .values(pool_action=PoolAction.DELETE, date_update=datetime.now())
         )
-        result: Result = await session.execute(stmt)
-        return result
+        raw_result: Result = await session.execute(stmt)
+        result = cast(CursorResult, raw_result)
+        return result.rowcount() > 0
 
     @classmethod
     async def get_object_pool(cls, session: AsyncSession, id_pool: int) -> Pool | None:

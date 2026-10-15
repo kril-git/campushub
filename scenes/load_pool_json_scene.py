@@ -94,7 +94,7 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
 
     @on.message(F.content_type == ContentType.DOCUMENT)
     async def load_json(self, message: Message, state: FSMContext) -> None:
-        if not is_admin(message.from_user.id):
+        if not await is_admin(message.from_user.id):
             await message.answer("Нет доступа.")
             logger.warning("Non-admin tried to import JSON: user_id=%s username=%s",
                            message.from_user.id, message.from_user.username,

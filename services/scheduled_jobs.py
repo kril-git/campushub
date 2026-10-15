@@ -111,14 +111,14 @@ async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> 
     active_pool = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
     active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
     if active_pool_id is None:
-        print(f"Пула для удаления нету {active_pool_id}")
+        await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"Пула для удаления нету")
         return
     else:
-        print(f"пул для удаления {active_pool_id}")
-        await PoolService.mark_as_deleted_pool(pool_id=active_pool_id)
-    if active_pool is None:
-        print("skjcdbaksdnckajsnckjasnckjsadncakjnckjcnkjanc")
-        return
+        await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"пул для удаления ID =  {active_pool_id}")
+        if await PoolService.mark_as_deleted_pool(pool_id=active_pool_id):
+            await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
+                                            text=f"пул ID =  {active_pool_id}, успешно помечен как не активный"
+                                            )
 
     if uuid is not None:
 
@@ -126,13 +126,6 @@ async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> 
         print(datetime.now().date())
         for user in uuid:
             await send_message_text_to_user(uuid=str(user), text=text)
-    # if active_pool.end_date < datetime.today().date():
-    #     logger.info(f"Опрос {active_pool.id} закрываем")
-    #     # await DAOPools.update_pool_actions(id=active_pool.id)
-    # else:
-    #     logger.info(f"Опроса для закрытия нет {active_pool}")
-
-    # print(active_pool)
 
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
