@@ -8,7 +8,7 @@ from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
 
 from database.dao.pool_dao import DAOPools
 from keyboards.callback_data_factory import PoolsCallbackFactory, PoolContinueFactory
-from keyboards.inline_keyboard import create_i_kb_begin, create_i_kb_pool_answers, i_kb_continue
+from keyboards.inline_keyboard import create_i_kb_begin, create_i_kb_pool_answers, i_kb_continue, i_kb_begin_or_exit
 from keyboards.reply_keyboar import r_kb_exit, r_kb_begin_exit
 from models import Answer, UserPool
 from services.EnumPools import PoolCategory
@@ -20,45 +20,54 @@ logger = logging.getLogger(__name__)
 
 class CompleteSurvey(Scene, state="complete_a_survey"):
 
-    @on.message.enter()
-    async def on_enter(self, message: Message, state: FSMContext) -> None:
+    # @on.message.enter()
+    @on.callback_query.enter()
+    # async def on_enter(self, message: Message, state: FSMContext) -> None:
+    async def on_enter(self, callback: CallbackQuery, state: FSMContext):
+        await callback.message.answer(f"Пришли в сцену")
         pool_id = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
         if not pool_id:
-            await message.answer("Активный опрос не найден.")
+            await callback.message.answer("Активный опрос не найден.")
             await self.wizard.exit()
             return
 
         await state.update_data(pool_id=pool_id, answer_list=[], question=0)
 
         completed: bool = await PoolService.check_survey_completion(
-            pool_id=pool_id, user_uuid=str(message.from_user.id)
+            pool_id=pool_id, user_uuid=str(callback.from_user.id)
         )
         await state.update_data(replay=completed)
 
         if completed:
-            await message.answer(
+            await callback.message.answer(
                 "Вы уже проходили данный опрос.\n"
                 "Если хотите пройти заново — нажмите 'Начать' 👇",
-                reply_markup=r_kb_begin_exit,
+                # reply_markup=r_kb_begin_exit,
+                reply_markup=i_kb_begin_or_exit(adjust=2),
             )
         else:
-            await message.answer(
+            await callback.message.answer(
                 "Мини опрос.\n"
                 "Если готовы — нажмите 'Начать', иначе 'Выход' 👇",
-                reply_markup=r_kb_begin_exit,
+                # reply_markup=r_kb_begin_exit,
+                reply_markup=i_kb_begin_or_exit(adjust=2),
+
             )
 
-    @on.message(F.text == "👌 Начать")
-    async def begin_survey(self, message: Message, state: FSMContext) -> None:
+    # @on.message(F.text == "👌 Начать")
+    @on.callback_query(F.data == "begin")
+    async def begin_survey(self, callback: CallbackQuery, state: FSMContext) -> None:
+        await callback.answer()
+        await callback.message.edit_reply_markup(reply_markup=None)
         data = await state.get_data()
         pool_id = data["pool_id"]
 
         if data.get("replay"):
             await PoolService.delete_user_pool(
-                pool_id=pool_id, user_uuid=str(message.from_user.id)
+                pool_id=pool_id, user_uuid=str(callback.from_user.id)
             )
 
-        await message.answer("Приступим 🕰", reply_markup=r_kb_exit)
+        await callback.message.answer("Приступим 🕰", reply_markup=r_kb_exit)
 
         pool = await PoolService.get_object_pool(id_pool=pool_id)
         count_questions = await PoolService.get_count_questions(pool_id=pool_id)
@@ -69,7 +78,7 @@ class CompleteSurvey(Scene, state="complete_a_survey"):
             answer_list=[],
         )
 
-        await message.answer(
+        await callback.message.answer(
             f"Описание {pool.pool_description}\n"
             f"Количество основных вопросов — {count_questions}",
             reply_markup=create_i_kb_begin(pool_id=0, pool_question=0, pool_answer=0),
@@ -178,12 +187,12 @@ class CompleteSurvey(Scene, state="complete_a_survey"):
         await callback.message.answer("Переходим к этапу 2.")
         logger.warning("Stage 2 not implemented")
 
-    @on.message(F.text == "🚫 Выход")
-    async def exit(self, message: Message) -> None:
-        await message.answer(
-            "Тогда может в следующий раз.",
-            reply_markup=ReplyKeyboardRemove(),
-        )
+    # @on.message(F.text == "🚫 Выход")
+    @on.callback_query(F.data == "exit")
+    async def exit(self, callback: CallbackQuery) -> None:
+        await callback.answer()
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.answer(f"Давай тогда в следующий раз")
         await self.wizard.exit()
 
     @on.message(Command("cancel"))

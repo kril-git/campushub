@@ -1,12 +1,13 @@
 import logging
-from aiogram import Router, flags
+from aiogram import Router, flags, F
 from aiogram.filters import CommandStart, Command, invert_f, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.scene import ScenesManager
-from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
 
 from config import bot
-from database.users_crud import if_exist_user, create_new_user, update_last_visit, get_given_name_by_uuid, get_user_by_uuid
+from database.users_crud import if_exist_user, create_new_user, update_last_visit, get_given_name_by_uuid, \
+    get_user_by_uuid
 from filters.is_admin import IsAdmin
 from filters.is_user import IsUser
 from filters.states_is_none import NoneStates
@@ -57,7 +58,7 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
         else:
             given_name = message.from_user.first_name
 
-        await message.answer(text=f"Привет, {given_name}. Рад тебя видеть.")
+        await message.answer(text=f"Привет, {given_name}. Рад тебя видеть.", reply_markup=ReplyKeyboardRemove())
         if not UserService.is_registered_user:
             await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
                                  reply_markup=ReplyKeyboardRemove())
@@ -104,6 +105,18 @@ async def clear(message: Message, state: FSMContext):
     await state.clear()
     current_state = await state.get_state()
     await message.answer(f"Текущее состояние: {current_state}")
+
+
+@router.callback_query(F.data == "complete_a_survey")
+async def trigger_survey_scene(callback: CallbackQuery, scenes: ScenesManager):
+    """
+    Принимает callback, тушит анимацию загрузки кнопки и запускает сцену.
+    Важно: аргумент `scenes` автоматически инжектируется библиотекой.
+    """
+    await callback.answer()  # Обязательно убираем "часики" на кнопке
+    await callback.message.answer(f"Попытка запустить сцену complete_a_survey")
+    # Передаем название сцены из вашего state="complete_a_survey"
+    await scenes.enter("complete_a_survey")
 
 
 @router.message(NoneStates())

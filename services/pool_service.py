@@ -21,14 +21,6 @@ from utils.text import truncate
 logger = logging.getLogger(__name__)
 
 
-# def get_passwords() -> list:
-#     return settings.PASSWORDS.split(",")
-#
-#
-# async def create_pool_data():
-#     pass
-
-
 class PoolService:
     @staticmethod
     @connection

@@ -32,8 +32,16 @@ def get_continue_cancel_keyboard_builder() -> InlineKeyboardMarkup:
     builder.button(text="❌ Отмена", callback_data="cancel")
     builder.adjust(2)  # 2 кнопки в ряд
     return builder.as_markup()
-#
-#
+
+
+def i_kb_begin_or_exit(adjust: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👌 Начать", callback_data="begin")
+    builder.button(text="🚫 Выход", callback_data="exit")
+    builder.adjust(adjust)  # 2 кнопки в ряд
+    return builder.as_markup()
+
+
 def create_i_kb_begin(pool_id: int, pool_question: int, pool_answer: int):
     builder = InlineKeyboardBuilder()
     builder.add((InlineKeyboardButton(text="Поехали",
@@ -41,6 +49,8 @@ def create_i_kb_begin(pool_id: int, pool_question: int, pool_answer: int):
                                           pool_id=pool_id, pool_question=pool_question, pool_answer=pool_answer).pack()
                                       )))
     return builder.as_markup()
+
+
 #
 #
 def create_i_kb_pool_answers(pool_id: int, pool_question: int, pool_answers: list[PoolAnswer]):
@@ -53,6 +63,8 @@ def create_i_kb_pool_answers(pool_id: int, pool_question: int, pool_answers: lis
                     )
     builder.adjust(1)
     return builder.as_markup()
+
+
 #
 #
 def i_kb_continue(step: int):
@@ -62,6 +74,8 @@ def i_kb_continue(step: int):
                                      )
                 )
     return builder.as_markup()
+
+
 def i_get_start_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для первого шага: Да / Нет"""
     return InlineKeyboardMarkup(
