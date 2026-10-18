@@ -22,7 +22,7 @@ class CompleteSurvey(Scene, state="complete_a_survey"):
 
     @on.message.enter()
     @on.callback_query.enter()
-    async def on_enter(self, event: TelegramObject, state: FSMContext):
+    async def on_enter(self, event: Message | CallbackQuery, state: FSMContext):
         # await callback.message.answer(f"Пришли в сцену")
         user_id = event.from_user.id
         if isinstance(event, CallbackQuery):

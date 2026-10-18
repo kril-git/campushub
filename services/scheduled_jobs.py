@@ -1,6 +1,7 @@
 # services/scheduled_jobs.py
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -36,8 +37,8 @@ logger = logging.getLogger(__name__)
 #
 
 
-    # if active_pool.end_date <= datetime.now().date():
-    #     await DAOPools.update_pool_actions(pool_id=active_pool.pool_uuid)
+# if active_pool.end_date <= datetime.now().date():
+#     await DAOPools.update_pool_actions(pool_id=active_pool.pool_uuid)
 
 
 #     # 1) Закрыть просроченные опросы
@@ -134,6 +135,7 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
                                              f"ok - {ok}\n"
                                              f"failed - {failed}")
 
+
 async def mark_as_deleted_pool_job() -> None:
     """
         Ежедневная задача 0:01 по Минску.
@@ -155,6 +157,7 @@ async def mark_as_deleted_pool_job() -> None:
 
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
+    now_in_minsk = datetime.now(ZoneInfo("Europe/Minsk"))
     """Регистрация всех периодических задач. Вызывать один раз при старте."""
     scheduler.add_job(
         mark_as_deleted_pool_job,
@@ -170,13 +173,20 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
     scheduler.add_job(daily_send_pool_job,
                       "date",
-                      run_date=datetime.now() + timedelta(minutes=1),
+                      run_date=now_in_minsk + timedelta(minutes=2),
                       kwargs={
                           "uuid": settings.TEST_USERS,
                           "text": f"Вам необходимо пройти опрос",
                       },
                       )
 
+    scheduler.add_job(daily_send_pool_job,
+                      trigger=CronTrigger(hour=0, minute=1),  # каждый день 0:01 Europe/Minsk
+                      id="daily_send_pool_job",
+                      replace_existing=True,
+                      misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
+                      coalesce=True,  # не запускать 10 раз подряд после простоя
+                      max_instances=1, )  # не пересекать запуски
 
     # scheduler.add_job(daily_pool_test_job,
     #                   "date",

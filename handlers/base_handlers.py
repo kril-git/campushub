@@ -137,21 +137,17 @@ async def clear(message: Message, state: FSMContext):
 #     await scenes.enter("complete_a_survey")
 
 
-# @router.callback_query(F.data == "/registration")
-# async def register_scene(callback: CallbackQuery, state: FSMContext, scenes: ScenesManager ):
-#     """
-#
-#     """
-#     await callback.answer()
-#     await callback.message.answer("111111111")
-#     # Создаем легальную копию сообщения, заменив from_user на пользователя, нажавшего кнопку
-#     updated_message = callback.message.model_copy(
-#         update={"from_user": callback.from_user}
-#     )
-#     # Удаляем старое сообщение с кнопкой
-#     await callback.message.delete()
-#
-#     await scenes.enter(RegistrationScene, message=updated_message)
+@router.callback_query(F.data == "exit_complete_a_survey")
+async def exit_complete_a_survey(callback: CallbackQuery):
+    """
+
+    """
+    await callback.answer()
+    # Удаляем старое сообщение с кнопкой
+    await callback.message.delete()
+    await callback.message.answer(f"ОК, Вы всегда можете пройти опрос, "
+                                  f"воспользовавшить командой /help или воспользовавшись меню бота.  ")
+    # await scenes.enter(RegistrationScene, message=updated_message)
 
 
 
