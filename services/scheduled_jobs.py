@@ -5,34 +5,39 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import settings
+from config import settings, bot
 # from core.dependencies import AppDependencies
 from database.dao.pool_dao import DAOPools, PoolDAO
+from keyboards.inline_keyboard import create_i_kb_from_dict
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
-from services.sending_service import send_message_text_to_user
+from services.sending_service import send_message_text_to_user, broadcast_text_all_users
 
 logger = logging.getLogger(__name__)
 
 
-async def daily_pool_job(test_users: list[int] | None = None) -> None:
-    """
-    Ежедневная задача 09:00 по Минску.
+# async def daily_pool_job(test_users: list[int] | None = None) -> None:
+#     """
+#     Ежедневная задача 09:00 по Минску.
+#
+#     test_users=None  → боевой режим, рассылка всем пользователям
+#     test_users=[...] → тестовый режим, только этим ID
+#     """
+#     # tz = AppDependencies.tz
+#     # today = datetime.now(tz).date()
+#     logger.info("🔔 daily_pool_job start")
+#
+#     #     Получаем активный пул если существует
+#     # active_pool = await DAOPools.get_pool_action(pool_category=PoolCategory.NONE)
+#     active_pool = await PoolDAO.get_id_action(pool_category=PoolCategory.NONE)
+#     if active_pool is None:
+#         logger.info("Нет опроса на сегодня — выходим")
+#         return
+#
 
-    test_users=None  → боевой режим, рассылка всем пользователям
-    test_users=[...] → тестовый режим, только этим ID
-    """
-    # tz = AppDependencies.tz
-    # today = datetime.now(tz).date()
-    logger.info("🔔 daily_pool_job start")
 
-    #     Получаем активный пул если существует
-    active_pool = await DAOPools.get_pool_action(pool_category=PoolCategory.NONE)
-    if active_pool is None:
-        return
-
-    if active_pool.end_date <= datetime.now().date():
-        await DAOPools.update_pool_actions(pool_id=active_pool.pool_uuid)
+    # if active_pool.end_date <= datetime.now().date():
+    #     await DAOPools.update_pool_actions(pool_id=active_pool.pool_uuid)
 
 
 #     # 1) Закрыть просроченные опросы
@@ -98,28 +103,36 @@ async def daily_pool_job(test_users: list[int] | None = None) -> None:
 #     stmt = select(User.id)  # или User.telegram_id — что у вас
 #     return [row[0] for row in (await session.execute(stmt)).all()]
 
-# async def daily_pool_test_job(uuid: list[str] | None = None, text: str = "") -> None:
-#     """
-#     Ежедневная задача 09:00 по Минску.
-#
-#     test_users=None  → боевой режим, рассылка всем пользователям
-#     test_users=[...] → тестовый режим, только этим ID
-#     """
-#     logger.info("🔔 daily_pool_job start")
-#
-#     #     Получаем активный пул если существует
-#     # active_pool = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
-#     active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
-#     if active_pool_id is None:
-#         await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"Пула для удаления нет")
-#         return
-#     else:
-#         await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"пул для удаления ID =  {active_pool_id}")
-#         if await PoolService.mark_as_deleted_pool(pool_id=active_pool_id):
-#             await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
-#                                             text=f"пул ID =  {active_pool_id}, успешно помечен как не активный"
-#                                             )
+async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> None:
+    """
+    Ежедневная задача 09:00 по Минску.
 
+    test_users=None  → боевой режим, рассылка всем пользователям
+    test_users=[...] → тестовый режим, только этим ID
+    """
+    logger.info("🔔 daily_pool_job start")
+
+    #     Получаем активный пул если существует
+    active_pool_id = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
+    # active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
+    if active_pool_id is None:
+        await send_message_text_to_user(uuid=str(uuid), text=f"Сегодня активного опроса нет.")
+        return
+    else:
+        # await broadcast_text_all_users()
+        data = {}
+        data.update({"complete_a_survey": "Пройти опрос"})
+        data.update({"exit_complete_a_survey": "Потом"})
+        kbd = create_i_kb_from_dict(data=data, adjust=1)
+        ok, failed = await broadcast_text_all_users(bot=bot,
+                                                    recipients=settings.TEST_USERS,
+                                                    text=text,
+                                                    reply_markup=kbd,
+                                                    )
+        await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
+                                        text=f"Отправлен опрос\n"
+                                             f"ok - {ok}\n"
+                                             f"failed - {failed}")
 
 async def mark_as_deleted_pool_job() -> None:
     """
@@ -154,6 +167,16 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     )
 
     logger.info("✅ mark_as_deleted_pool_job зарегистрирован (cron 0:01 Europe/Minsk)")
+
+    scheduler.add_job(daily_send_pool_job,
+                      "date",
+                      run_date=datetime.now() + timedelta(minutes=1),
+                      kwargs={
+                          "uuid": settings.TEST_USERS,
+                          "text": f"Вам необходимо пройти опрос",
+                      },
+                      )
+
 
     # scheduler.add_job(daily_pool_test_job,
     #                   "date",

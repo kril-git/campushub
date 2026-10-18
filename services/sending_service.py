@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError, TelegramBadRequest, TelegramAPIError
+from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, ForceReply
 from aiogram.utils.chat_action import ChatActionSender
 
 from config import bot
@@ -23,6 +24,7 @@ async def send_message_text_to_user(
         uuid: str,
         text: str,
         disable_notification: bool = False,
+        reply_markup: InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply | None = None,
         max_retries: int = 3,
 ) -> bool:
     for attempt in range(max_retries):
@@ -31,6 +33,7 @@ async def send_message_text_to_user(
                 chat_id=uuid,
                 text=text,
                 disable_notification=disable_notification,
+                reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML,
             )
         except TelegramRetryAfter as e:
@@ -57,7 +60,11 @@ async def send_message_text_to_user(
     return False
 
 
-async def broadcast_text_all_users(bot: Bot, recipients: list[str], text: str) -> tuple[int, int]:
+async def broadcast_text_all_users(bot: Bot,
+                                   recipients: list[str],
+                                   text: str,
+                                   reply_markup: InlineKeyboardMarkup | ReplyKeyboardMarkup | ReplyKeyboardRemove | ForceReply | None = None,
+                                   ) -> tuple[int, int]:
     ok = failed = 0
     for raw_id in recipients:
         chat_id = _to_chat_id(raw_id)
@@ -71,6 +78,7 @@ async def broadcast_text_all_users(bot: Bot, recipients: list[str], text: str) -
                     chat_id=chat_id,
                     text=text,
                     disable_notification=True,
+                    reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML,
                     # parse_mode="HTML",
                 )
@@ -81,6 +89,7 @@ async def broadcast_text_all_users(bot: Bot, recipients: list[str], text: str) -
                 await bot.send_message(
                     chat_id=chat_id,
                     text=text,
+                    reply_markup=reply_markup,
                     disable_notification=True,
                 )
                 ok += 1
