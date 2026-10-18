@@ -60,7 +60,7 @@ class PoolService:
 
     @staticmethod
     @readonly
-    async def get_active_pool_id(session: AsyncSession, pool_category: PoolCategory) -> int | None:
+    async def get_active_pool_id(session: AsyncSession, pool_category: PoolCategory = PoolCategory.NONE) -> int | None:
         return await PoolDAO.get_id_action(session, pool_category)
 
     @staticmethod
@@ -77,12 +77,15 @@ class PoolService:
     @readonly
     async def check_survey_completion(session: AsyncSession, **kwargs) -> bool:
         """
-        Вернет False если пользователь не проходил опрос
-        """
-        if await UserPoolDAO.get_check_survey_completion(session=session, **kwargs) is None:
+           Вернет False если пользователь не проходил опрос или значение в БД равно False
+           """
+        res = await UserPoolDAO.get_check_survey_completion(session=session, **kwargs)
+
+        # Если записи нет (None) или в столбце записано False — возвращаем False (пользователь может проходить)
+        if res is None or res is False:
             return False
-        else:
-            return True
+
+        return True
 
     @staticmethod
     @connection

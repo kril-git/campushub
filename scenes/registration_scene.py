@@ -305,13 +305,27 @@ class RegistrationScene(Scene, state="registration_scene"):
     # ВХОД В СЦЕНУ
     # ============================================================
 
-    @on.message.enter()
-    async def on_enter(self, message: Message, state: FSMContext):
+    # @on.message.enter()
+    @on.callback_query.enter()
+    # async def on_enter(self, message: Message, state: FSMContext):
+    async def on_enter(self, callback: CallbackQuery, state: FSMContext):
+        await callback.answer()
+        await callback.message.answer("dfvdvasdcasdcasdcasdcasdc")
+        try:
+            await callback.message.delete()
+        except Exception as e:
+            logger.warning(f"Не удалось удалить сообщение меню: {e}")
+
+        # 3️⃣ Извлекаем данные: ID нажавшего пользователя и сам объект сообщения бота
+        user_id = callback.from_user.id
+        message = callback.message
+
+
         """Вход в сцену - показывает текущий шаг"""
         # Проверка: зарегистрирован ли пользователь
-        user = await get_user_by_uuid(uuid=str(message.from_user.id))
+        user = await get_user_by_uuid(uuid=str(user_id))
         if user and user.registration:
-            await message.answer(
+            await callback.message.answer(
                 "✅ Вы уже зарегистрированы!",
                 reply_markup=ReplyKeyboardRemove()
             )

@@ -32,8 +32,8 @@ class PoolDAO(BaseDAO[Pool]):
             select(cls.model.id).where(and_(cls.model.pool_action == PoolAction.ACTION,
                                             cls.model.pool_category == pool_category,
                                             func.cast(cls.model.start_date, Date) <= today),
-                                            func.cast(cls.model.end_date, Date) >= today
-                                            ).limit(1)
+                                       func.cast(cls.model.end_date, Date) >= today
+                                       ).limit(1)
         )
         result = await session.execute(stmt)
         id_pool = result.scalar()
@@ -44,15 +44,15 @@ class PoolDAO(BaseDAO[Pool]):
                                     session: AsyncSession,
                                     start: date,
                                     end: date,
-                                    pool_category: EnumPools = PoolCategory.NONE,) -> bool:
+                                    pool_category: EnumPools = PoolCategory.NONE, ) -> bool:
         stmt = (
             select(cls.model)
             .where(
                 # Если даты в БД хранятся как DateTime, приводим их к Date для точного сравнения дней
                 func.cast(cls.model.start_date, Date) < end,
-                            func.cast(cls.model.end_date, Date) > start,
-                            cls.model.pool_action == PoolAction.ACTION,
-                            cls.model.pool_category == pool_category
+                func.cast(cls.model.end_date, Date) > start,
+                cls.model.pool_action == PoolAction.ACTION,
+                cls.model.pool_category == pool_category
             )
             .limit(1)
         )
@@ -175,10 +175,13 @@ class UserPoolDAO(BaseDAO[UserPool]):
 
     @classmethod
     async def get_check_survey_completion(cls, session: AsyncSession, **kwargs) -> Result | None:
-        stmt = select(cls.model).where(and_(cls.model.user_uuid == kwargs["user_uuid"],
-                                            cls.model.pool_id == kwargs["pool_id"]))
+        await session.rollback()
+
+        stmt = select(cls.model.end_pool).where(and_(cls.model.user_uuid == kwargs["user_uuid"],
+                                                     cls.model.pool_id == kwargs["pool_id"]))
         result = await session.execute(stmt)
-        return result.one_or_none()
+        session.expire_all()
+        return result.scalar_one_or_none()
 
     @classmethod
     async def delete_by_user_and_pool(cls, session: AsyncSession, **kwargs):

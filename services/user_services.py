@@ -9,7 +9,9 @@ from database.connection import readonly
 from database.users_crud import get_user_by_uuid
 from lexicon.lexicon import LEXICON_USER_HELP
 from models import User
+from services.pool_service import PoolService
 from utils.converters import uuid_to_str
+from database.dao.users_dao import UserDAO
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ class UserService:
     @readonly
     async def is_registered_user(session: AsyncSession, uuid: str | int) -> bool:
         uuid_str = await uuid_to_str(uuid=uuid)
-        return await UserDao.is_registered(session=session, uuid=uuid_str)  # type: ignore
+        return await UserDAO.is_registered(session=session, uuid=uuid_str)
 
 
 # рабочий
@@ -30,10 +32,19 @@ async def get_help_user(message: Message) -> dict:
         locale = "ru"
     locale = "ru"
     from lexicon.lexicon import LEXICON_USER_HELP
-    data = LEXICON_USER_HELP[locale.upper()]
+    data = LEXICON_USER_HELP[locale.upper()].copy()
     user: User = await get_user_by_uuid(uuid=message.from_user.id)  # type: ignore
     if not user.registration:
-        data.update({"/registration": "Пройти регистрацию"})
+        data.update({"registration": "Пройти регистрацию"})
+    active_pool = await PoolService.get_active_pool_id()
+    completed: bool = await PoolService.check_survey_completion(
+        pool_id=active_pool, user_uuid=str(message.from_user.id)
+    )
+    await message.answer(f"active_pool {active_pool}   completed {completed}")
+
+    if active_pool is not None and not completed:
+        await message.answer(f"Активный опрос {active_pool}")
+        data.update({"complete_a_survey": "Пройти текущий опрос"})
     return data
 
 

@@ -135,7 +135,8 @@ LEXICON_ADMIN_TEST: dict[str, str] = {
 
 LEXICON_USER_HELP: dict[str, dict[str, str]] = {
     "RU": {
-        "/info": " - Общая информация."
+        "info": "Общая информация.",
+        "get_info": "Доступные действия."
     },
     "EN": {
     }

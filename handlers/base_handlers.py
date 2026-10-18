@@ -12,16 +12,20 @@ from filters.is_admin import IsAdmin
 from filters.is_user import IsUser
 from filters.states_is_none import NoneStates
 from filters.states_is_not_none import IsNotNoneStates
+from keyboards.inline_keyboard import create_i_kb_from_dict
 # from keyboards.inline_keyboard import create_i_kb_from_dict
 # from keyboards.set_menu import set_main_menu
 from keyboards.set_menu import set_main_menu
 from lexicon.lexicon import LEXICON_MAIN, Lexicon
 from lexicon.lexicon_ru import LEXICON_DIRECTORIES, LEXICON_DIRECTORIES_SCENE
 from models import User
+from scenes.registration_scene import RegistrationScene
 # from scenes.accounting_products import AccountingProductsScene
 from scenes.settings_scene import SettingsScene
 from services import EnumRoles
+from services.EnumPools import PoolCategory
 from services.admin_services import get_help_admin
+from services.pool_service import PoolService
 from services.user_services import send_dict, create_str_from_dict, get_help_user, UserService
 
 router = Router(name=__name__)
@@ -59,7 +63,7 @@ async def cmd_start(message: Message, admins, scenes: ScenesManager, state: FSMC
             given_name = message.from_user.first_name
 
         await message.answer(text=f"Привет, {given_name}. Рад тебя видеть.", reply_markup=ReplyKeyboardRemove())
-        if not UserService.is_registered_user:
+        if not await UserService.is_registered_user(uuid=message.from_user.id):
             await message.answer(text=Lexicon.get_text(lang="RU", key="user_exist"),
                                  reply_markup=ReplyKeyboardRemove())
         await set_main_menu(bot=bot, uuid=message.from_user.id)
@@ -82,10 +86,24 @@ async def get_help(message: Message):
 @router.message(Command(commands="help"), IsUser(), StateFilter(None))
 async def get_help(message: Message):
     locale_help: dict = await get_help_user(message=message)
-    data = ""
-    for key, value in locale_help.items():
-        data += f"{key} {value}\n"
-    await message.answer(text=data)
+    data = "Что то надо тут написать"
+    # for key, value in locale_help.items():
+    #     data += f"{key} {value}\n"
+    kbd = create_i_kb_from_dict(data=locale_help, adjust=1)
+    await message.answer(text=data, reply_markup=kbd)
+
+
+@router.message(Command(commands="get_info"), IsUser(), StateFilter(None))
+async def get_users_info(message: Message):
+    registration = await UserService.is_registered_user(uuid=message.from_user.id)
+    pool_id = await PoolService.get_active_pool_id()
+    if not registration:
+        await message.answer(f"Вы не прошли регистрацию")
+    else:
+        await message.answer(f"вы прошли регистрацию {registration}, {message.from_user.id}")
+    if pool_id is not None:
+        await message.answer(f"Есть доступный опрос")
+    pass
 
 
 @router.message(Command(commands="test"), IsAdmin())
@@ -107,16 +125,34 @@ async def clear(message: Message, state: FSMContext):
     await message.answer(f"Текущее состояние: {current_state}")
 
 
-@router.callback_query(F.data == "complete_a_survey")
-async def trigger_survey_scene(callback: CallbackQuery, scenes: ScenesManager):
-    """
-    Принимает callback, тушит анимацию загрузки кнопки и запускает сцену.
-    Важно: аргумент `scenes` автоматически инжектируется библиотекой.
-    """
-    await callback.answer()  # Обязательно убираем "часики" на кнопке
-    await callback.message.answer(f"Попытка запустить сцену complete_a_survey")
-    # Передаем название сцены из вашего state="complete_a_survey"
-    await scenes.enter("complete_a_survey")
+# @router.callback_query(F.data == "complete_a_survey")
+# async def trigger_survey_scene(callback: CallbackQuery, scenes: ScenesManager):
+#     """
+#     Принимает callback, тушит анимацию загрузки кнопки и запускает сцену.
+#     Важно: аргумент `scenes` автоматически инжектируется библиотекой.
+#     """
+#     await callback.answer()  # Обязательно убираем "часики" на кнопке
+#     await callback.message.answer(f"Попытка запустить сцену complete_a_survey")
+#     # Передаем название сцены из вашего state="complete_a_survey"
+#     await scenes.enter("complete_a_survey")
+
+
+# @router.callback_query(F.data == "/registration")
+# async def register_scene(callback: CallbackQuery, state: FSMContext, scenes: ScenesManager ):
+#     """
+#
+#     """
+#     await callback.answer()
+#     await callback.message.answer("111111111")
+#     # Создаем легальную копию сообщения, заменив from_user на пользователя, нажавшего кнопку
+#     updated_message = callback.message.model_copy(
+#         update={"from_user": callback.from_user}
+#     )
+#     # Удаляем старое сообщение с кнопкой
+#     await callback.message.delete()
+#
+#     await scenes.enter(RegistrationScene, message=updated_message)
+
 
 
 @router.message(NoneStates())

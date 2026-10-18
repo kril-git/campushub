@@ -35,5 +35,5 @@ class UserDAO(BaseDAO[User]):
     async def is_registered(cls, session: AsyncSession, uuid: str) -> bool:
         stmt = select(User.registration).where(User.uuid == uuid)
         result: Result = await session.execute(stmt)
-        is_registered: bool = result.scalar().one_or_none()
+        is_registered: bool = result.scalar()
         return is_registered

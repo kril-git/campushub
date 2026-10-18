@@ -1,6 +1,6 @@
 __all__ = ("router")
 
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.scene import Scene
 
@@ -60,9 +60,14 @@ router.include_routers(
     # echo_router,
 )
 
-router.message.register(
+# router.message.register(
+#     RegistrationScene.as_handler(),
+#     Command("registration")
+# )
+
+router.callback_query.register(
     RegistrationScene.as_handler(),
-    Command("registration")
+    F.data == "registration"
 )
 
 router.message.register(
@@ -78,6 +83,11 @@ router.message.register(
 router.message.register(
     CompleteSurvey.as_handler(),
     Command("complete_a_survey")
+)
+
+router.callback_query.register(
+    CompleteSurvey.as_handler(),
+    F.data == "complete_a_survey"
 )
 
 router.include_router(echo_router)

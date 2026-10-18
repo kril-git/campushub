@@ -4,7 +4,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.scene import Scene, on
-from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
+from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery, TelegramObject
 
 from database.dao.pool_dao import DAOPools
 from keyboards.callback_data_factory import PoolsCallbackFactory, PoolContinueFactory
@@ -20,33 +20,43 @@ logger = logging.getLogger(__name__)
 
 class CompleteSurvey(Scene, state="complete_a_survey"):
 
-    # @on.message.enter()
+    @on.message.enter()
     @on.callback_query.enter()
-    # async def on_enter(self, message: Message, state: FSMContext) -> None:
-    async def on_enter(self, callback: CallbackQuery, state: FSMContext):
-        await callback.message.answer(f"Пришли в сцену")
+    async def on_enter(self, event: TelegramObject, state: FSMContext):
+        # await callback.message.answer(f"Пришли в сцену")
+        user_id = event.from_user.id
+        if isinstance(event, CallbackQuery):
+            await event.answer()
+            message = event.message
+            await message.answer(f"You have been {event.data}")
+            try:
+                await event.message.delete()  # Удаляем меню с кнопкой
+            except Exception as e:
+                logger.warning(f"Не удалось удалить сообщение: {e}")
+        else:
+            message = event
         pool_id = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
         if not pool_id:
-            await callback.message.answer("Активный опрос не найден.")
+            await message.answer("Активный опрос не найден.")
             await self.wizard.exit()
             return
 
         await state.update_data(pool_id=pool_id, answer_list=[], question=0)
 
         completed: bool = await PoolService.check_survey_completion(
-            pool_id=pool_id, user_uuid=str(callback.from_user.id)
+            pool_id=pool_id, user_uuid=str(user_id)
         )
         await state.update_data(replay=completed)
 
         if completed:
-            await callback.message.answer(
+            await message.answer(
                 "Вы уже проходили данный опрос.\n"
                 "Если хотите пройти заново — нажмите 'Начать' 👇",
                 # reply_markup=r_kb_begin_exit,
                 reply_markup=i_kb_begin_or_exit(adjust=2),
             )
         else:
-            await callback.message.answer(
+            await message.answer(
                 "Мини опрос.\n"
                 "Если готовы — нажмите 'Начать', иначе 'Выход' 👇",
                 # reply_markup=r_kb_begin_exit,
