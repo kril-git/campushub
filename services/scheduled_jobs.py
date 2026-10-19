@@ -3,6 +3,9 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from aiogram.fsm import storage
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.base import StorageKey
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -12,7 +15,8 @@ from database.dao.pool_dao import DAOPools, PoolDAO
 from keyboards.inline_keyboard import create_i_kb_from_dict
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
-from services.sending_service import send_message_text_to_user, broadcast_text_all_users
+from services.sending_service import send_message_text_to_user, broadcast_text_all_users, LAST_BROADCAST_MSG_ID
+from services.services import _to_chat_id
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +117,32 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
     """
     logger.info("🔔 daily_pool_job start")
 
+    # 1️⃣ СРАЗУ ОПРЕДЕЛЯЕМ ПОЛУЧАТЕЛЕЙ (чтобы знать, у кого чистить экран)
+    recipients = uuid if uuid is not None else settings.TEST_USERS
+    # 2️⃣ ЭТАП ЗАЧИСТКИ (ВЫПОЛНЯЕТСЯ ВСЕГДА): Удаляем вчерашние висящие опросы с экрана [💡]
+    for raw_id in recipients:
+        chat_id = _to_chat_id(raw_id)
+        if chat_id is None:
+            continue
+
+        try:
+            from core.dependencies import AppDependencies
+
+            storage_key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=chat_id, destiny="default")
+            user_state = FSMContext(storage=AppDependencies.storage, key=storage_key)
+
+            user_fsm_data = await user_state.get_data()
+            old_message_id = user_fsm_data.get(LAST_BROADCAST_MSG_ID)
+
+            if old_message_id:
+                # Стираем вчерашнее сообщение, чат теперь идеально чистый [💡]
+                await bot.delete_message(chat_id=chat_id, message_id=old_message_id)
+
+                # Не забываем стереть этот ID из Redis, так как сообщения больше нет в природе
+                await user_state.update_data({LAST_BROADCAST_MSG_ID: None})
+        except Exception:
+            pass
+
     #     Получаем активный пул если существует
     active_pool_id = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
     # active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
@@ -129,11 +159,13 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
                                                     recipients=settings.TEST_USERS,
                                                     text=text,
                                                     reply_markup=kbd,
+                                                    save_last_message=True,
                                                     )
         await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
                                         text=f"Отправлен опрос\n"
                                              f"ok - {ok}\n"
-                                             f"failed - {failed}")
+                                             f"failed - {failed}\n"
+                                             f"pool - {active_pool_id}\n")
 
 
 async def mark_as_deleted_pool_job() -> None:
@@ -181,8 +213,12 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
                       )
 
     scheduler.add_job(daily_send_pool_job,
-                      trigger=CronTrigger(hour=0, minute=1),  # каждый день 0:01 Europe/Minsk
+                      trigger=CronTrigger(hour=9, minute=30,  timezone=ZoneInfo("Europe/Minsk") ),  # каждый день 9:00 Europe/Minsk
                       id="daily_send_pool_job",
+                      kwargs={
+                          "uuid": settings.TEST_USERS,
+                          "text": f"Вам необходимо пройти опрос",
+                      },
                       replace_existing=True,
                       misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
                       coalesce=True,  # не запускать 10 раз подряд после простоя

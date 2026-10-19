@@ -28,7 +28,8 @@ async def main():
     dp = Dispatcher(
         storage=AppDependencies.storage,
         events_isolation=SimpleEventIsolation(),
-        fsm_strategy=FSMStrategy.USER_IN_CHAT
+        # fsm_strategy=FSMStrategy.USER_IN_CHAT
+        fsm_strategy=FSMStrategy.CHAT
     )
 
     dp.update.middleware(SSHHealthMiddleware())

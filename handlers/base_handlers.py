@@ -150,7 +150,6 @@ async def exit_complete_a_survey(callback: CallbackQuery):
     # await scenes.enter(RegistrationScene, message=updated_message)
 
 
-
 @router.message(NoneStates())
 async def send_echo(message: Message):
     try:

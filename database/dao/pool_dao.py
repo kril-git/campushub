@@ -17,12 +17,12 @@ class PoolDAO(BaseDAO[Pool]):
 
     @classmethod
     async def add_pool_record(cls, session: AsyncSession, data: Pool) -> model:
-        pool_id = await cls.get_id_action(
-            session=session,
-            pool_category=data.pool_category,
-        )
-        if pool_id is not None:
-            await cls.mark_as_deleted(session=session, pool_id=pool_id)
+        # pool_id = await cls.get_id_action(
+        #     session=session,
+        #     pool_category=data.pool_category,
+        # )
+        # if pool_id is not None:
+        #     await cls.mark_as_deleted(session=session, pool_id=pool_id)
         return await cls.add(session=session, data=data)
 
     @classmethod
@@ -45,19 +45,31 @@ class PoolDAO(BaseDAO[Pool]):
                                     start: date,
                                     end: date,
                                     pool_category: EnumPools = PoolCategory.NONE, ) -> bool:
+        # stmt = (
+        #     select(cls.model)
+        #     .where(
+        #         # Если даты в БД хранятся как DateTime, приводим их к Date для точного сравнения дней
+        #         func.cast(cls.model.start_date, Date) < end,
+        #         func.cast(cls.model.end_date, Date) > start,
+        #         cls.model.pool_action == PoolAction.ACTION,
+        #         cls.model.pool_category == pool_category
+        #     )
+        #     .limit(1)
+        # )
         stmt = (
             select(cls.model)
             .where(
-                # Если даты в БД хранятся как DateTime, приводим их к Date для точного сравнения дней
-                func.cast(cls.model.start_date, Date) < end,
-                func.cast(cls.model.end_date, Date) > start,
+                cls.model.start_date < end,
+                cls.model.end_date > start,
                 cls.model.pool_action == PoolAction.ACTION,
                 cls.model.pool_category == pool_category
             )
             .limit(1)
         )
+
         result = await session.execute(stmt)
-        return result.first() is not None
+        pool_instance = result.scalars().first()
+        return pool_instance is not None
 
     @classmethod
     async def get_uuid_action(cls, session: AsyncSession, pool_category: EnumPools) -> str | None:

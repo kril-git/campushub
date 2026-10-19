@@ -7,6 +7,7 @@ from aiogram.fsm.scene import Scene
 from handlers.base_handlers import router as echo_router
 from handlers.admin_handlers import router as admin_router
 from handlers.test_handlers import router as test_router
+from handlers.cancel_handler import router as cancel_router
 # from handlers.set_user_to_admin_handler import router as set_user_to_admin_handler
 # from handlers.main_commands_handlers import router as main_commands_handlers
 # from handlers.accounting_handlers import router as accounting_router
@@ -55,15 +56,8 @@ router = Router(name=__name__)
 router.include_routers(
     admin_router,
     test_router,
-    # registration_router,
-    # broadcast_text_router,
-    # echo_router,
 )
 
-# router.message.register(
-#     RegistrationScene.as_handler(),
-#     Command("registration")
-# )
 
 router.callback_query.register(
     RegistrationScene.as_handler(),
@@ -90,7 +84,8 @@ router.callback_query.register(
     F.data == "complete_a_survey"
 )
 
-router.include_router(echo_router)
+router.include_routers(cancel_router,
+                       echo_router)
 
 
 def get_scenes() -> list[type(Scene)]:

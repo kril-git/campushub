@@ -100,9 +100,9 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
                            message.from_user.id, message.from_user.username,
                            )
             return
-        if message.document.mime_type != "application/json":
-            await message.answer("Я ожидаю JSON файл.")
-            return
+        # if message.document.mime_type != "application/json":
+        #     await message.answer("Я ожидаю JSON файл.")
+        #     return
         data = await self._get_data_from_json(message=message)
         if not data:
             await message.answer(
@@ -122,12 +122,13 @@ class LoadPoolJsonScene(Scene, state="load_pool_json_scene"):
         except (ValueError, TypeError):
             await message.answer("Некорректный формат дат в JSON. Ожидается ДД.ММ.ГГГГ")
             return
-
-        if start_date < date.today():
+        from zoneinfo import ZoneInfo
+        current_minsk_date = datetime.now(ZoneInfo("Europe/Minsk")).date()
+        if start_date < current_minsk_date:
             await message.answer(text="Дата начала опроса меньше текущей, проверьте дату")
             return
 
-        if end_date <= date.today() or start_date >= end_date:
+        if end_date <= current_minsk_date or start_date >= end_date:
             await message.answer(text="Проверьте дату окончания опроса, она некорректна.")
             return
         if await PoolService.has_intersecting_pool(start=start_date, end=end_date):

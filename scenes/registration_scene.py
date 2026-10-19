@@ -6,7 +6,7 @@ from database.users_crud import get_user_by_uuid, save_user_registration
 import re
 from typing import Optional
 
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.scene import Scene, on
@@ -29,6 +29,12 @@ class RegistrationScene(Scene, state="registration_scene"):
     """Сцена регистрации студентов"""
 
     DEFAULT_LANG = "RU"
+
+    is_valid_input = (
+            F.text &
+            ~F.text.startswith("/") &
+            ~F.text.casefold().in_({"выход", "отмена", "стоп", "cancel", "exit"})
+    )
 
     # ============================================================
     # ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
@@ -180,7 +186,7 @@ class RegistrationScene(Scene, state="registration_scene"):
         if step == "cancelled":
             await message.answer(
                 "❌ Регистрация отменена.\n\n"
-                "Вы можете начать заново через команду /registration",
+                "Вы можете начать заново через команду /help",
                 reply_markup=ReplyKeyboardRemove()
             )
             await state.clear()
@@ -301,16 +307,28 @@ class RegistrationScene(Scene, state="registration_scene"):
                     reply_markup=i_get_cancel_keyboard()
                 )
 
+    @on.message(Command("cancel", "stop", "exit"))
+    @on.message(F.text.casefold().in_({"выход", "отмена", "стоп"}))
+    async def local_scene_cancel(self, message: Message, state: FSMContext):
+        """
+        Перехватывает системную команду отмены, на каком бы текстовом шаге
+        (ввод фамилии, имени, группы и т.д.) ни находился пользователь.
+        """
+        logger.info(f"🛑 Пользователь {message.from_user.id} прервал регистрацию текстом.")
+
+        # Переключаем стейт на статус отмены
+        await state.update_data(step="cancelled")
+
+        # Передаем управление вашему централизованному методу отображения
+        await self.show_step(message, state)
+
     # ============================================================
     # ВХОД В СЦЕНУ
     # ============================================================
 
-    # @on.message.enter()
     @on.callback_query.enter()
-    # async def on_enter(self, message: Message, state: FSMContext):
     async def on_enter(self, callback: CallbackQuery, state: FSMContext):
         await callback.answer()
-        await callback.message.answer("dfvdvasdcasdcasdcasdcasdc")
         try:
             await callback.message.delete()
         except Exception as e:
@@ -355,7 +373,7 @@ class RegistrationScene(Scene, state="registration_scene"):
     # ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ
     # ============================================================
 
-    @on.message()
+    @on.message(is_valid_input | F.contact)
     async def process_message(self, message: Message, state: FSMContext):
         """Обработка текстовых сообщений и контактов"""
         data = await state.get_data()
@@ -629,7 +647,7 @@ class RegistrationScene(Scene, state="registration_scene"):
 
                 # ✅ Отправляем сообщение и ВСЁ!
                 await callback.message.answer(
-                    "Вы можете начать заново через команду /registration",
+                    "Вы можете начать заново через команду /help",
                     reply_markup=ReplyKeyboardRemove()
                 )
                 return  # ✅ Выходим, чтобы не было лишних вызовов
@@ -698,6 +716,47 @@ class RegistrationScene(Scene, state="registration_scene"):
                 )
                 await self.show_step(callback.message, state)
 
+    @on.message()
+    async def process_unknown_input(self, message: Message, state: FSMContext):
+        """
+        Срабатывает, если пользователь ввел команду вроде /fff,
+        отправил стикер, гифку или то, что не прошло валидацию фильтров.
+        """
+        data = await state.get_data()
+        step = data.get("step", "start")
+
+        logger.info(f"⚠️ Неизвестный ввод на шаге {step}: {message.text or message.content_type}")
+
+        # Если пользователь попытался ввести какую-то левую команду со слэшем
+        if message.text and message.text.startswith("/"):
+            error_text = (
+                f"❌ Команда <code>{message.text}</code> не поддерживается во время регистрации.\n"
+                f"Пожалуйста, продолжите заполнение формы 👇"
+            )
+        else:
+            error_text = "⚠️ Неверный формат ввода. Пожалуйста, следуйте инструкциям на экране 👇"
+
+        # Стираем старую Reply-клавиатуру, чтобы не было конфликтов интерфейса
+        await message.answer(error_text, reply_markup=ReplyKeyboardRemove())
+
+        # Повторно показываем текущий шаг, чтобы пользователь не потерялся [💡]
+        await state.update_data(step=step)
+        await self.show_step(message, state)
+
+    @on.callback_query()
+    async def process_unknown_callback(self, callback: CallbackQuery, state: FSMContext):
+        """
+        🚀 А ВОТ ЗДЕСЬ ИСПОЛЬЗУЕМ АЛАРМ!
+        Срабатывает, если пользователь внутри сцены нажал на какую-то
+        левую, старую или неподдерживаемую инлайн-кнопку.
+        """
+        logger.warning(f"⚠️ Неизвестный клик по кнопке внутри сцены: {callback.data}")
+
+        # Выводим красивое всплывающее окно с кнопкой "ОК" прямо на экран телефона [1]
+        await callback.answer(
+            text="⚠️ Это действие сейчас недоступно.\nПожалуйста, заполните текстовую форму на экране!",
+            show_alert=True  # Именной этот параметр превращает уведомление в АЛАРМ [1]
+        )
 # ============================================================
 # РЕГИСТРАЦИЯ КОМАНДЫ
 # ============================================================
