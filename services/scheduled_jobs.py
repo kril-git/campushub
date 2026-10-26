@@ -16,6 +16,7 @@ from database.dao.pool_dao import DAOPools, PoolDAO
 from keyboards.inline_keyboard import create_i_kb_from_dict, generate_inline_keyboard_for_question
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
+from services.recipients_services import RecipientsService
 from services.sending_service import send_message_text_to_user, broadcast_text_all_users, LAST_BROADCAST_MSG_ID
 from services.services import _to_chat_id
 from utils.cleanup_old_survey_messages import cleanup_old_survey_messages
@@ -188,13 +189,24 @@ async def direct_send_pool_job(recipients: list[int] | None = None, text: str = 
         return
 
     # 2. Получатели
-    target_users = recipients if recipients is not None else settings.TEST_USERS
+    # target_users = recipients if recipients is not None else settings.TEST_USERS
+    target_users = await RecipientsService.get_recipients(override=recipients,
+                                                          pool_id=active_pool_id)
+
+    target_strs = [str(u) for u in target_users]
+    logger.warning(
+        "🔍 получателей=%d, есть ли 7740157654? %s",
+        len(target_users), "7740157654" in target_strs,
+    )
+
     if not target_users:
         logger.warning("direct_send_pool_job: нет получателей")
         return
 
-    # 3. Чистка вчерашних сообщений
-    await cleanup_old_survey_messages(recipients=[str(u) for u in target_users])
+    # 3. Чистка вчерашних сообщений для всех зарегистрированных пользователей
+    all_users = await RecipientsService.get_all_telegram_ids()
+
+    await cleanup_old_survey_messages(recipients=[str(u) for u in all_users])
 
     # 4. Первый вопрос
     first_q = await PoolService.get_first_question_of_pool(pool_id=active_pool_id)

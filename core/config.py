@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     MAIN_ADMIN: str
     TEST_USERS: list[str]
+    TEST_MODE: bool
     LOCALHOST: str
     PG_PORT: int
     SSH_INT_PORT: int
