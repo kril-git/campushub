@@ -9,6 +9,7 @@ from redis.asyncio import Redis
 from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
 
 from config import settings
+from core.storage import AppStorage
 from infrastructure.tunnelmanager import TunnelManager
 # from database.helper import db_helper
 import logging
@@ -79,43 +80,15 @@ class AppDependencies:
                                                 decode_responses=True
                                                 )
 
-        # Redis Storage для FSM
-        key_builder = DefaultKeyBuilder(with_bot_id=True, with_destiny=True)
-        cls.storage = RedisStorage(
-            redis=cls.redis_client,
-            key_builder=key_builder,
-            state_ttl=60 * 60 * 24,
-            data_ttl=60 * 60 * 48,
-        )
+        # 3. Storage (делегируем в AppStorage)
+        AppStorage.setup(cls.redis_client)
+        cls.storage = AppStorage.storage  # ← для совместимости
+
         cls.scheduler = AsyncIOScheduler(timezone=cls.tz)
         cls.scheduler.start()
         print("Scheduler running:", cls.scheduler.running)
         logger.info(f"Scheduler running: {cls.scheduler.running}")
         register_jobs(cls.scheduler)
-
-        # def keepalive():
-        #     print("keepalive ----------> сработал", flush=True)
-        #     logger.info("Scheduler running: %s", cls.scheduler.running)
-        #     # logger.info("Loop running: %s", asyncio.get_event_loop().is_running())
-        #
-        # cls.scheduler.add_job(keepalive, "interval", seconds=30)
-        # cls.scheduler.add_job(send_message_text_to_user,
-        #                       "date",
-        #                       run_date=datetime.now(cls.tz) + timedelta(minutes=5),
-        #                       kwargs={
-        #                           "uuid": settings.MAIN_ADMIN,
-        #                           "text": "Привет",
-        #                       },
-        #                       misfire_grace_time=3600,
-        #                       )
-        #
-        # job = cls.scheduler.add_job(send_message_io_and_mio_moglie,
-        #                             "date",
-        #                             run_date=((datetime.now(cls.tz) + timedelta(days=1)).replace(
-        #                                 hour=6, minute=00, second=0, microsecond=0)
-        #                             ))
-        # print("Сейчас по Минску:", datetime.now(cls.tz))
-        # print("Сработает в:     ", job.next_run_time)
 
         cls._initialized = True
         logger.info(f"✅ Зависимости инициализированы {'(туннель)' if cls.use_tunnel else '(локально)'}")
@@ -134,8 +107,9 @@ class AppDependencies:
         if cls.storage:
             await cls.storage.close()
 
-        if cls.redis_client:
-            await cls.redis_client.close()
+        await AppStorage.close()  # закрывает storage + redis_client
+        cls.storage = None
+        cls.redis_client = None
 
         if cls.tunnel_manager:
             await cls.tunnel_manager.close()

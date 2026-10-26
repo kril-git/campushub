@@ -31,12 +31,8 @@ class BaseDAO(Generic[T]):
             raise TypeError(
                 f"data must be {cls.model.__name__} or dict, got {type(data).__name__}"
             )
-        try:
-            session.add(instance)
-            await session.commit()
-        except SQLAlchemyError:
-            await session.rollback()
-            raise
+        session.add(instance)
+        await session.flush()
         return instance
 
     @classmethod
@@ -51,12 +47,9 @@ class BaseDAO(Generic[T]):
                 raise TypeError(
                     f"item must be {cls.model.__name__} or dict, got {type(item).__name__}"
                 )
-        try:
-            session.add_all(instances)
-            await session.commit()
-        except SQLAlchemyError:
-            await session.rollback()
-            raise
+
+        session.add_all(instances)
+        await session.flush()
         return instances
 
     @classmethod

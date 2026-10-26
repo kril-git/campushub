@@ -3,6 +3,7 @@ from typing import Sequence, Any, cast
 
 from sqlalchemy import select, Result, update, and_, func, RowMapping, delete, CursorResult, Date
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from database.connection import connection
 from database.dao.base import BaseDAO
@@ -74,7 +75,8 @@ class PoolDAO(BaseDAO[Pool]):
     @classmethod
     async def get_uuid_action(cls, session: AsyncSession, pool_category: EnumPools) -> str | None:
         stmt = (
-            select(Pool.pool_uuid).where(Pool.pool_action == PoolAction.ACTION and Pool.pool_category == pool_category)
+            select(Pool.pool_uuid).where(and_(Pool.pool_action == PoolAction.ACTION,
+                                              Pool.pool_category == pool_category))
         )
         result = await session.execute(stmt)
         uuid_pool: str | None = result.one_or_none()
@@ -115,6 +117,15 @@ class PoolQuestionDAO(BaseDAO[PoolQuestion]):
     async def add_pool_question(cls, session: AsyncSession, data: PoolQuestion) -> PoolQuestion:
         return await cls.add(session=session, data=data)
 
+    @classmethod
+    async def get_question_by_id(cls, session: AsyncSession, question_id: int) -> model | None:
+        stmt = (
+            select(cls.model)
+            .options(selectinload(cls.model.poolanswer))
+            .where(cls.model.id == question_id)
+        )
+        return (await session.execute(stmt)).scalar_one_or_none()
+
     # @staticmethod
     # async def get_object_pool_question_by_pool_id(session: AsyncSession, pool_id: int) -> Sequence[PoolQuestion]:
     #     stmt = select(PoolQuestion).where(PoolQuestion.pool_id == pool_id)
@@ -134,13 +145,46 @@ class PoolQuestionDAO(BaseDAO[PoolQuestion]):
         stmt = select(PoolQuestion).where(
             and_(PoolQuestion.pool_id == pool_id, PoolQuestion.question_number == number_q))
         result = await session.execute(stmt)
-        return result.scalars().one()
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def get_count_questions(session: AsyncSession, pool_id: int) -> int:
         stmt = select(func.count(PoolQuestion.pool_id)).select_from(PoolQuestion).where(PoolQuestion.pool_id == pool_id)
         result = await session.scalar(stmt)
         return result
+
+    @staticmethod
+    async def get_next_question(session: AsyncSession, pool_id: int, current_question_number: int) -> PoolQuestion | None:
+        """
+        Ищет следующий вопрос в пуле по его порядковому номеру (question_number).
+        Возвращает объект PoolQuestion или None, если вопросы закончились.
+        """
+        stmt = (
+            select(PoolQuestion)
+            .where(PoolQuestion.pool_id == pool_id)
+            .where(PoolQuestion.question_number > current_question_number)
+            .order_by(PoolQuestion.question_number.asc())
+            # Подгружаем связанные варианты ответов (связь poolanswer),
+            # чтобы они сразу были доступны для генерации кнопок в сцене [💡]
+            .options(selectinload(PoolQuestion.poolanswer))
+            .limit(1)
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_first_question_of_pool(session: AsyncSession, pool_id: int) -> PoolQuestion | None:
+        stmt = (
+            select(PoolQuestion)
+            .where(PoolQuestion.pool_id == pool_id)
+            .order_by(PoolQuestion.question_number.asc())
+            .options(selectinload(PoolQuestion.poolanswer))
+            .limit(1)
+        )
+
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
 
 class PoolAnswerDAO(BaseDAO[PoolAnswer]):
@@ -156,7 +200,7 @@ class PoolAnswerDAO(BaseDAO[PoolAnswer]):
     async def get_object_pool_answer_by_id(session: AsyncSession, answer_id: int) -> PoolAnswer:
         stmt = select(PoolAnswer).where(PoolAnswer.id == answer_id)
         result = await session.execute(stmt)
-        return result.scalar()
+        return result.scalar_one_or_none()
 
 
 class AnswerDAO(BaseDAO[Answer]):
@@ -187,13 +231,20 @@ class UserPoolDAO(BaseDAO[UserPool]):
 
     @classmethod
     async def get_check_survey_completion(cls, session: AsyncSession, **kwargs) -> Result | None:
-        await session.rollback()
+        # await session.rollback()
 
         stmt = select(cls.model.end_pool).where(and_(cls.model.user_uuid == kwargs["user_uuid"],
                                                      cls.model.pool_id == kwargs["pool_id"]))
         result = await session.execute(stmt)
-        session.expire_all()
+        # session.expire_all()
         return result.scalar_one_or_none()
+
+    @classmethod
+    async def get_by_user_and_pool(cls, session, user_uuid: str, pool_id: int) -> model | None:
+        stmt = select(cls.model).where(
+            cls.model.user_uuid == user_uuid, cls.model.pool_id == pool_id,
+        )
+        return (await session.execute(stmt)).scalar_one_or_none()
 
     @classmethod
     async def delete_by_user_and_pool(cls, session: AsyncSession, **kwargs):

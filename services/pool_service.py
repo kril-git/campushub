@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import connection, readonly
 
 from core.config import settings
-from database.dao.pool_dao import DAOPools, PoolDAO, PoolQuestionDAO, PoolAnswerDAO, UserPoolDAO, AnswerDAO
+from database.dao.pool_dao import PoolDAO, PoolQuestionDAO, PoolAnswerDAO, UserPoolDAO, AnswerDAO
 from models.pool import Pool, PoolQuestion, PoolAnswer, Answer, UserPool
 # from scenes.load_pool_json_scene import logger
 from services.EnumPoolAction import PoolAction
@@ -135,22 +135,35 @@ class PoolService:
                                                                                       number_q=number_q)
         return data
 
-    @staticmethod
-    @connection
-    async def get_object_pool_answer_by_question_id(session: AsyncSession, question_id: int) -> list[PoolAnswer]:
-        data = await PoolAnswerDAO.get_object_pool_answer_by_question_id(session=session, question_id=question_id)
-        return list(data)
+    # @staticmethod
+    # @connection
+    # async def get_object_pool_answer_by_question_id(session: AsyncSession, question_id: int) -> list[PoolAnswer]:
+    #     data = await PoolAnswerDAO.get_object_pool_answer_by_question_id(session=session, question_id=question_id)
+    #     return list(data)
+
+    # @staticmethod
+    # @connection
+    # async def finish_survey(
+    #         session: AsyncSession,
+    #         answers: list[Answer],
+    #         user_pool: UserPool,
+    # ) -> None:
+    #     await AnswerDAO.add_many(session, answers)
+    #     await UserPoolDAO.add(session, user_pool)
+    #     # commit сделает @connection — один на всё
 
     @staticmethod
     @connection
-    async def finish_survey(
-            session: AsyncSession,
-            answers: list[Answer],
-            user_pool: UserPool,
-    ) -> None:
+    async def finish_survey(session: AsyncSession, answers: list[Answer], user_pool: UserPool) -> None:
         await AnswerDAO.add_many(session, answers)
-        await UserPoolDAO.add(session, user_pool)
-        # commit сделает @connection — один на всё
+        existing = await UserPoolDAO.get_by_user_and_pool(
+            session=session, user_uuid=user_pool.user_uuid, pool_id=user_pool.pool_id,
+        )
+        if existing:
+            existing.end_pool = True
+            existing.step = user_pool.step
+        else:
+            await UserPoolDAO.add(session, user_pool)
 
     @staticmethod
     @connection
@@ -166,6 +179,23 @@ class PoolService:
     @readonly
     async def get_object_pool_answer_by_question_id(session: AsyncSession, question_id: int) -> Sequence[PoolQuestion]:
         return await PoolAnswerDAO.get_object_pool_answer_by_question_id(session=session, question_id=question_id)
+
+    @staticmethod
+    @readonly
+    async def get_next_question(session: AsyncSession, pool_id, current_question_number) -> PoolQuestion | None:
+        return await PoolQuestionDAO.get_next_question(session=session,
+                                                       pool_id=pool_id,
+                                                       current_question_number=current_question_number)
+
+    @staticmethod
+    @readonly
+    async def get_question_by_id(session, question_id: int) -> PoolQuestion | None:
+        return await PoolQuestionDAO.get_question_by_id(session=session, question_id=question_id)
+
+    @staticmethod
+    @readonly
+    async def get_first_question_of_pool(session: AsyncSession, pool_id: int) -> PoolQuestion | None:
+        return await PoolQuestionDAO.get_first_question_of_pool(session=session, pool_id=pool_id)
 
 
 async def get_info_pool(pool_id: int) -> str:

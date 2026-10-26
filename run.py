@@ -11,6 +11,7 @@ from aiogram.utils.chat_action import ChatActionMiddleware
 from config import bot, settings
 from config.logger_config import setup_logging
 from core.dependencies import AppDependencies
+from core.storage import AppStorage
 from database.users_crud import get_users_by_role
 from middleware.database import SSHHealthMiddleware
 from routers import router as main_router, get_scenes
@@ -26,7 +27,7 @@ async def main():
     # if settings.USE_TUNNEL:
     await AppDependencies.initialize()
     dp = Dispatcher(
-        storage=AppDependencies.storage,
+        storage=AppStorage.storage,
         events_isolation=SimpleEventIsolation(),
         # fsm_strategy=FSMStrategy.USER_IN_CHAT
         fsm_strategy=FSMStrategy.CHAT

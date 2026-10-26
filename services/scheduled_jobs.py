@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from aiogram import Bot
 from aiogram.fsm import storage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
@@ -12,11 +13,12 @@ from apscheduler.triggers.cron import CronTrigger
 from config import settings, bot
 # from core.dependencies import AppDependencies
 from database.dao.pool_dao import DAOPools, PoolDAO
-from keyboards.inline_keyboard import create_i_kb_from_dict
+from keyboards.inline_keyboard import create_i_kb_from_dict, generate_inline_keyboard_for_question
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
 from services.sending_service import send_message_text_to_user, broadcast_text_all_users, LAST_BROADCAST_MSG_ID
 from services.services import _to_chat_id
+from utils.cleanup_old_survey_messages import cleanup_old_survey_messages
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +121,7 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
 
     # 1️⃣ СРАЗУ ОПРЕДЕЛЯЕМ ПОЛУЧАТЕЛЕЙ (чтобы знать, у кого чистить экран)
     recipients = uuid if uuid is not None else settings.TEST_USERS
+    await cleanup_old_survey_messages(bot=bot, recipients=recipients)
     # 2️⃣ ЭТАП ЗАЧИСТКИ (ВЫПОЛНЯЕТСЯ ВСЕГДА): Удаляем вчерашние висящие опросы с экрана [💡]
     for raw_id in recipients:
         chat_id = _to_chat_id(raw_id)
@@ -134,12 +137,12 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
             user_fsm_data = await user_state.get_data()
             old_message_id = user_fsm_data.get(LAST_BROADCAST_MSG_ID)
 
-            if old_message_id:
-                # Стираем вчерашнее сообщение, чат теперь идеально чистый [💡]
-                await bot.delete_message(chat_id=chat_id, message_id=old_message_id)
-
-                # Не забываем стереть этот ID из Redis, так как сообщения больше нет в природе
-                await user_state.update_data({LAST_BROADCAST_MSG_ID: None})
+            # if old_message_id:
+            #     # Стираем вчерашнее сообщение, чат теперь идеально чистый [💡]
+            #     await bot.delete_message(chat_id=chat_id, message_id=old_message_id)
+            #
+            #     # Не забываем стереть этот ID из Redis, так как сообщения больше нет в природе
+            #     await user_state.update_data({LAST_BROADCAST_MSG_ID: None})
         except Exception:
             pass
 
@@ -166,6 +169,64 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
                                              f"ok - {ok}\n"
                                              f"failed - {failed}\n"
                                              f"pool - {active_pool_id}\n")
+
+
+async def direct_send_pool_job(recipients: list[int] | None = None, text: str = "") -> None:
+    """
+    Рассылка первого вопроса активного пула 'прямо в лоб'.
+
+    - Если recipients=None — берём settings.TEST_USERS.
+    - Перед рассылкой — чистим вчерашние висящие сообщения.
+    - Кнопки — start_pool_click (сразу в сцену, без промежуточного 'Пройти / Потом').
+    """
+    logger.info("🔔 Запуск direct_send_pool_job")
+
+    # 1. Активный пул
+    active_pool_id = await PoolService.get_active_pool_id()
+    if active_pool_id is None:
+        logger.info("Нет активных опросов на сегодня. Джоб direct_send_pool_job завершен.")
+        return
+
+    # 2. Получатели
+    target_users = recipients if recipients is not None else settings.TEST_USERS
+    if not target_users:
+        logger.warning("direct_send_pool_job: нет получателей")
+        return
+
+    # 3. Чистка вчерашних сообщений
+    await cleanup_old_survey_messages(recipients=[str(u) for u in target_users])
+
+    # 4. Первый вопрос
+    first_q = await PoolService.get_first_question_of_pool(pool_id=active_pool_id)
+    if not first_q:
+        logger.warning("Пул %s активен, но в нем нет вопросов!", active_pool_id)
+        return
+
+    # 5. Клавиатура — одна на всех (не в цикле!)
+    kbd = generate_inline_keyboard_for_question(
+        buttons=first_q.poolanswer,
+        prefix=f"start_pool_click:{active_pool_id}:{first_q.question_number}",
+    )
+
+    # 6. Рассылка — broadcast сам обходит получателей (без внешнего for!)
+    ok, failed = await broadcast_text_all_users(
+        bot=bot,
+        recipients=[str(u) for u in target_users],
+        text=f"<b>📊 Доступен новый опрос!</b>\n\n{first_q.pool_question}",
+        reply_markup=kbd,
+        save_last_message=True,   # ← сохранит message_id для завтрашней чистки
+    )
+    logger.info("direct_send_pool_job: ok=%s, failed=%s", ok, failed)
+
+    # 7. Уведомление админа (опционально)
+    await send_message_text_to_user(
+        uuid=str(settings.MAIN_ADMIN),
+        text=(
+            f"📤 direct_send_pool_job завершён\n"
+            f"pool={active_pool_id}\n"
+            f"ok={ok}\nfailed={failed}"
+        ),
+    )
 
 
 async def mark_as_deleted_pool_job() -> None:
@@ -203,17 +264,18 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
 
     logger.info("✅ mark_as_deleted_pool_job зарегистрирован (cron 0:01 Europe/Minsk)")
 
-    scheduler.add_job(daily_send_pool_job,
-                      "date",
-                      run_date=now_in_minsk + timedelta(minutes=2),
-                      kwargs={
-                          "uuid": settings.TEST_USERS,
-                          "text": f"Вам необходимо пройти опрос",
-                      },
-                      )
+    # scheduler.add_job(daily_send_pool_job,
+    #                   "date",
+    #                   run_date=now_in_minsk + timedelta(minutes=2),
+    #                   kwargs={
+    #                       "uuid": settings.TEST_USERS,
+    #                       "text": f"Вам необходимо пройти опрос",
+    #                   },
+    #                   )
 
     scheduler.add_job(daily_send_pool_job,
-                      trigger=CronTrigger(hour=9, minute=30,  timezone=ZoneInfo("Europe/Minsk") ),  # каждый день 9:00 Europe/Minsk
+                      trigger=CronTrigger(hour=9, minute=30, timezone=ZoneInfo("Europe/Minsk")),
+                      # каждый день 9:00 Europe/Minsk
                       id="daily_send_pool_job",
                       kwargs={
                           "uuid": settings.TEST_USERS,
@@ -224,11 +286,11 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
                       coalesce=True,  # не запускать 10 раз подряд после простоя
                       max_instances=1, )  # не пересекать запуски
 
-    # scheduler.add_job(daily_pool_test_job,
-    #                   "date",
-    #                   run_date=datetime.now() + timedelta(minutes=1),
-    #                   kwargs={
-    #                       "uuid": settings.TEST_USERS,
-    #                       "text": "Проверка выполнения задания по рассписани, сообщение только админам",
-    #                   },
-    #                   )
+    scheduler.add_job(direct_send_pool_job,
+                      "date",
+                      run_date=datetime.now() + timedelta(minutes=1),
+                      kwargs={
+                          "recipients": settings.TEST_USERS,
+                          "text": "Проверка выполнения задания по рассписани, сообщение только админам",
+                      },
+                      )

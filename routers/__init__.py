@@ -1,4 +1,4 @@
-__all__ = ("router")
+__all__ = ("router", "get_scenes")  # Исправили кортеж в __all__
 
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -8,57 +8,34 @@ from handlers.base_handlers import router as echo_router
 from handlers.admin_handlers import router as admin_router
 from handlers.test_handlers import router as test_router
 from handlers.cancel_handler import router as cancel_router
-# from handlers.set_user_to_admin_handler import router as set_user_to_admin_handler
-# from handlers.main_commands_handlers import router as main_commands_handlers
-# from handlers.accounting_handlers import router as accounting_router
-from scenes.settings_scene import router as scene_router
-from scenes import settings_scene
-# from scenes.accounting_products import router as accounting_scene_router
-from scenes import accounting_products
-# from scenes.accounting_category import router as accounting_category_router
-# from scenes.load_pool_json_scene import router as pool_load_router, LoadPoolJsonScene
-from scenes import accounting_category
-from scenes import load_pool_json_scene
-from scenes import complete_a_survey_scene
-from scenes import registration_scene
-from scenes.registration_scene import router as registration_router, RegistrationScene
-from scenes.broadcast_text_scene import router as broadcast_text_router, BroadcastScene
-from scenes import broadcast_text_scene
-from scenes.load_pool_json_scene import router as load_pool_json_scene, LoadPoolJsonScene
-from scenes import load_pool_json_scene
-from scenes.complete_a_survey_scene import router as complete_a_survey_router, CompleteSurvey
-from scenes import complete_a_survey_scene
+from handlers.survey_starter import router as survey_starter_router
 
-# from scenes.complete_a_survey_scene import router as complete_a_survey_router
+from scenes import registration_scene
+from scenes.registration_scene import RegistrationScene
+
+from scenes import broadcast_text_scene
+from scenes.broadcast_text_scene import BroadcastScene
+
+from scenes import load_pool_json_scene
+from scenes.load_pool_json_scene import LoadPoolJsonScene
+
+from scenes import complete_a_survey_scene
+from scenes.complete_a_survey_scene import CompleteSurvey
+
+from scenes import direct_survey_scene
+# from scenes.direct_survey_scene import DirectSurveyScene
 
 router = Router(name=__name__)
 
-# ✅ Возвращаем роутер с командой
-# def get_routers() -> Router:
-#     """Возвращает роутер с командой /registration"""
-#     router_s = Router(name="registration_router")
-#
-#     # Регистрируем команду
-#     router_s.message.register(
-#         RegistrationScene.as_handler(),
-#         Command("registration")
-#     )
-#
-#     # Можно зарегистрировать дополнительные команды
-#     router_s.message.register(
-#         RegistrationScene.as_handler(),
-#         Command("reg")  # Альтернативная команда
-#     )
-#
-#     return router_s
-
-
+# ✅ Регистрируем ВСЕ хэндлеры и внутренние роутеры сцен в правильном порядке
 router.include_routers(
     admin_router,
     test_router,
+    survey_starter_router,  # Он поймает самый первый клик "start_pool_click:"
+    # direct_survey_router,  # Он будет ловить внутренние клики сцены "survey_ans:"
 )
 
-
+# Регистрируем стартовые точки входа для остальных сцен
 router.callback_query.register(
     RegistrationScene.as_handler(),
     F.data == "registration"
@@ -84,15 +61,18 @@ router.callback_query.register(
     F.data == "complete_a_survey"
 )
 
-router.include_routers(cancel_router,
-                       echo_router)
+router.include_routers(
+    cancel_router,
+    echo_router
+)
 
 
-def get_scenes() -> list[type(Scene)]:
+# ✅ Обязательно добавляем класс новой сцены в список возвращаемых сцен!
+def get_scenes() -> list[type[Scene]]:
     return [
         registration_scene.RegistrationScene,
         broadcast_text_scene.BroadcastScene,
         load_pool_json_scene.LoadPoolJsonScene,
         complete_a_survey_scene.CompleteSurvey,
-
+        direct_survey_scene.DirectSurveyScene,  # Добавили сюда! 🔥
     ]

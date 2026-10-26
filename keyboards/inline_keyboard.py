@@ -114,3 +114,35 @@ def i_get_confirm_keyboard() -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def generate_inline_keyboard_for_question(
+        buttons: list[PoolAnswer],
+        prefix: str
+) -> InlineKeyboardMarkup:
+    """
+    Динамически генерирует инлайн-клавиатуру для вопроса.
+
+    :param buttons: Список объектов PoolAnswer из связи question.poolanswer
+    :param prefix: Строка префикса, например "survey_ans:23:2" или "start_pool_click:23:1"
+    :return: Объект InlineKeyboardMarkup для отправки в bot.send_message
+    """
+    builder = InlineKeyboardBuilder()
+
+    for answer in buttons:
+        # answer.pool_answer — текст, который увидит пользователь на кнопке
+        # answer.id — уникальный ID ответа в базе данных, крепим его к префиксу [💡]
+        callback_data = f"{prefix}:{answer.id}"
+
+        builder.add(
+            InlineKeyboardButton(
+                text=answer.pool_answer,  # Текст кнопки (например: "Да", "Нет")
+                callback_data=callback_data
+            )
+        )
+
+    # .adjust(1) располагает каждую кнопку на новой строке (одна под другой).
+    # Если хотите кнопки в ряд (если они короткие), можно сделать .adjust(2) [💡]
+    builder.adjust(1)
+
+    return builder.as_markup()
