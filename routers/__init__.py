@@ -9,6 +9,7 @@ from handlers.admin_handlers import router as admin_router
 from handlers.test_handlers import router as test_router
 from handlers.cancel_handler import router as cancel_router
 from handlers.survey_starter import router as survey_starter_router
+from handlers.fallback_handlers import router as fallback_router
 
 from scenes import registration_scene
 from scenes.registration_scene import RegistrationScene
@@ -23,7 +24,6 @@ from scenes import complete_a_survey_scene
 from scenes.complete_a_survey_scene import CompleteSurvey
 
 from scenes import direct_survey_scene
-# from scenes.direct_survey_scene import DirectSurveyScene
 
 router = Router(name=__name__)
 
@@ -62,6 +62,7 @@ router.callback_query.register(
 )
 
 router.include_routers(
+    fallback_router,
     cancel_router,
     echo_router
 )

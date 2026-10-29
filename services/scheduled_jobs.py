@@ -17,6 +17,7 @@ from keyboards.inline_keyboard import create_i_kb_from_dict, generate_inline_key
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
 from services.recipients_services import RecipientsService
+from services.report_service import ReportService
 from services.sending_service import send_message_text_to_user, broadcast_text_all_users, LAST_BROADCAST_MSG_ID
 from services.services import _to_chat_id
 from utils.cleanup_old_survey_messages import cleanup_old_survey_messages
@@ -243,24 +244,50 @@ async def direct_send_pool_job(recipients: list[int] | None = None, text: str = 
 
 async def mark_as_deleted_pool_job() -> None:
     """
-        Ежедневная задача 0:01 по Минску.
-
-        Проверяет активный опрос и помечает его как оконченный если дата окончания опроса вчера
-
+    Ежедневная задача 0:01 по Минску.
+    Помечает опрос как оконченный, если дата окончания вчера.
+    После закрытия — генерирует Excel-отчёт и отправляет админу.
     """
     logger.info("🔔 mark_as_deleted_pool_job start")
-    active_pool_id = await PoolService.get_active_pool_end_date_yesterday(pool_category=PoolCategory.NONE)
+
+    active_pool_id = await PoolService.get_active_pool_end_date_yesterday(
+        pool_category=PoolCategory.NONE
+    )
     if active_pool_id is None:
-        await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"Пула для удаления нет")
+        await send_message_text_to_user(
+            uuid=settings.MAIN_ADMIN,
+            text="Пула для удаления нет",
+        )
         return
-    else:
-        await send_message_text_to_user(uuid=settings.MAIN_ADMIN, text=f"пул для удаления ID =  {active_pool_id}")
-        if await PoolService.mark_as_deleted_pool(pool_id=active_pool_id):
-            await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
-                                            text=f"пул ID =  {active_pool_id}, успешно помечен как не активный"
-                                            )
 
+    await send_message_text_to_user(
+        uuid=settings.MAIN_ADMIN,
+        text=f"Пул для удаления ID = {active_pool_id}",
+    )
 
+    # 1. Помечаем как неактивный
+    if not await PoolService.mark_as_deleted_pool(pool_id=active_pool_id):
+        await send_message_text_to_user(
+            uuid=settings.MAIN_ADMIN,
+            text=f"❌ Пул {active_pool_id} не удалось пометить как неактивный",
+        )
+        return
+
+    await send_message_text_to_user(
+        uuid=settings.MAIN_ADMIN,
+        text=f"✅ Пул {active_pool_id} успешно помечен как неактивный. Генерирую отчёт...",
+    )
+
+    # 2. Генерируем и отправляем отчёт
+    try:
+        await ReportService.send_pool_report_to_admin(pool_id=active_pool_id)
+        logger.info("mark_as_deleted_pool_job: отчёт по пулу %s отправлен", active_pool_id)
+    except Exception as e:
+        logger.exception("Ошибка отправки отчёта pool=%s: %s", active_pool_id, e)
+        await send_message_text_to_user(
+            uuid=settings.MAIN_ADMIN,
+            text=f"❌ Ошибка генерации отчёта по пулу {active_pool_id}: {e}",
+        )
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
     now_in_minsk = datetime.now(ZoneInfo("Europe/Minsk"))
     """Регистрация всех периодических задач. Вызывать один раз при старте."""

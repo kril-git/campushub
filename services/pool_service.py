@@ -197,6 +197,14 @@ class PoolService:
     async def get_first_question_of_pool(session: AsyncSession, pool_id: int) -> PoolQuestion | None:
         return await PoolQuestionDAO.get_first_question_of_pool(session=session, pool_id=pool_id)
 
+    @staticmethod
+    @readonly
+    async def get_recent_pools(
+            session: AsyncSession, limit: int = 5
+    ) -> list[Pool]:
+        """Последние N пулов."""
+        return await PoolDAO.get_recent_pools(session=session, limit=limit)
+
 
 async def get_info_pool(pool_id: int) -> str:
     pool = await PoolService.get_object_pool(id_pool=pool_id)

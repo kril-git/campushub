@@ -18,12 +18,6 @@ class PoolDAO(BaseDAO[Pool]):
 
     @classmethod
     async def add_pool_record(cls, session: AsyncSession, data: Pool) -> model:
-        # pool_id = await cls.get_id_action(
-        #     session=session,
-        #     pool_category=data.pool_category,
-        # )
-        # if pool_id is not None:
-        #     await cls.mark_as_deleted(session=session, pool_id=pool_id)
         return await cls.add(session=session, data=data)
 
     @classmethod
@@ -46,17 +40,6 @@ class PoolDAO(BaseDAO[Pool]):
                                     start: date,
                                     end: date,
                                     pool_category: EnumPools = PoolCategory.NONE, ) -> bool:
-        # stmt = (
-        #     select(cls.model)
-        #     .where(
-        #         # Если даты в БД хранятся как DateTime, приводим их к Date для точного сравнения дней
-        #         func.cast(cls.model.start_date, Date) < end,
-        #         func.cast(cls.model.end_date, Date) > start,
-        #         cls.model.pool_action == PoolAction.ACTION,
-        #         cls.model.pool_category == pool_category
-        #     )
-        #     .limit(1)
-        # )
         stmt = (
             select(cls.model)
             .where(
@@ -109,6 +92,20 @@ class PoolDAO(BaseDAO[Pool]):
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    @classmethod
+    async def get_recent_pools(cls, session: AsyncSession, limit: int = 5) -> list[Pool]:
+        """
+        Последние N пулов (по id desc).
+        Включает все — активные, удалённые, будущие.
+        """
+        stmt = (
+            select(cls.model)
+            .order_by(cls.model.id.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
 
 class PoolQuestionDAO(BaseDAO[PoolQuestion]):
     model = PoolQuestion
@@ -154,7 +151,8 @@ class PoolQuestionDAO(BaseDAO[PoolQuestion]):
         return result
 
     @staticmethod
-    async def get_next_question(session: AsyncSession, pool_id: int, current_question_number: int) -> PoolQuestion | None:
+    async def get_next_question(session: AsyncSession, pool_id: int,
+                                current_question_number: int) -> PoolQuestion | None:
         """
         Ищет следующий вопрос в пуле по его порядковому номеру (question_number).
         Возвращает объект PoolQuestion или None, если вопросы закончились.

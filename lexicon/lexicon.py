@@ -131,6 +131,7 @@ LEXICON_ADMIN_TEST: dict[str, str] = {
     "_campushub_test_active_pool_": "Активный пул",
     "_get_active_pool_id_": "Активный опрос ID",
     "complete_a_survey":  "Пройти опрос",
+    "test_report": "Проверка отчета на диск",
 }
 
 LEXICON_USER_HELP: dict[str, dict[str, str]] = {

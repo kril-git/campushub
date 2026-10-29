@@ -20,6 +20,7 @@ from keyboards.reply_keyboar import r_kb_cancel
 from models import User
 from services.admin_services import send_users_list_4096, split_into_chunks, send_chunks, split_strings_into_chunks
 from services.render import render_users
+from services.report_service import ReportService
 from states.admin_states import FSMSetUserToAdmin
 
 router = Router(name=__name__)
@@ -123,6 +124,28 @@ async def callback_text_1(callback: CallbackQuery):
 async def test(message: Message):
     kbd = create_i_kb_from_dict(data=LEXICON_ADMIN_TEST, adjust=1)
     await message.answer(text="Доступные тесты.", reply_markup=kbd)
+
+
+@router.message(Command("test_report"))
+async def cmd_test_report(message: Message):
+    if str(message.from_user.id) not in settings.ADMINS:
+        return
+
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("Использование: /test_report <pool_id>")
+        return
+
+    try:
+        pool_id = int(args[1])
+    except ValueError:
+        await message.answer("pool_id должен быть числом")
+        return
+
+    await message.answer(f"⏳ Генерирую отчёт по пулу {pool_id}...")
+
+    # Генерируем и шлём админу
+    await ReportService.send_pool_report_to_admin(pool_id=pool_id)
 
 
 # рабочий
