@@ -79,9 +79,16 @@ class PoolDAO(BaseDAO[Pool]):
     @classmethod
     async def get_object_pool(cls, session: AsyncSession, id_pool: int) -> Pool | None:
         stmt = (select(cls.model)
-                .where(cls.model.pool_action == PoolAction.ACTION, cls.model.id == id_pool))
+                .where(cls.model.id == id_pool))
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    # @classmethod
+    # async def get_object_pool(cls, session: AsyncSession, id_pool: int) -> Pool | None:
+    #     stmt = (select(cls.model)
+    #             .where(cls.model.pool_action == PoolAction.ACTION, cls.model.id == id_pool))
+    #     result = await session.execute(stmt)
+    #     return result.scalar_one_or_none()
 
     @classmethod
     async def get_pool_id_by_date_end_now_yesterday(cls, session: AsyncSession,

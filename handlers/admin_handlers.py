@@ -6,6 +6,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import bot
 from core.config import settings
@@ -19,6 +20,7 @@ from filters.is_admin import IsAdmin
 from keyboards.reply_keyboar import r_kb_cancel
 from models import User
 from services.admin_services import send_users_list_4096, split_into_chunks, send_chunks, split_strings_into_chunks
+from services.pool_service import PoolService
 from services.render import render_users
 from services.report_service import ReportService
 from states.admin_states import FSMSetUserToAdmin
@@ -113,11 +115,61 @@ async def test(message: Message):
     pass
 
 
-@router.callback_query(F.data == "/test11", IsAdmin())
+@router.callback_query(F.data.startswith("_get_recent_pools_"), IsAdmin())
 async def callback_text_1(callback: CallbackQuery):
+    await callback.answer()
     await callback.message.delete()
-    await callback.answer(text="dddddddddcdcsdcdscdcscdcdss")
+
     await callback.message.answer(text="нажали test1")
+    # ✅ Последние 5 пулов
+    pools = await PoolService.get_recent_pools(limit=5)
+    if not pools:
+        await callback.message.answer("Нет пулов")
+        return
+
+    builder = InlineKeyboardBuilder()
+    for pool in pools:
+        # Обрезаем описание, добавляем статус
+        desc = (pool.pool_description or "")[:30]
+        status = "🟢" if pool.pool_action.value == "ACTION" else "⚪"
+        # Формат: "🟢 28: ПРОФИЛАКТИКА СУИЦИД..."
+        builder.button(
+            text=f"{status} {pool.id}: {desc}",
+            callback_data=f"get_recent_pools:{pool.id}",
+        )
+    builder.adjust(1)
+    await callback.message.answer(
+        "Выбери пул для теста (5 последних):",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("get_recent_pools"))
+async def on_test_report_click(callback: CallbackQuery):
+    if str(callback.from_user.id) not in settings.ADMINS:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    _, pool_id_str = callback.data.split(":")
+    try:
+        pool_id = int(pool_id_str)
+    except ValueError:
+        await callback.answer("Неверный pool_id", show_alert=True)
+        return
+
+    await callback.answer(f"Генерирую отчёт pool={pool_id}")
+
+    # Показываем сообщение о процессе
+    progress_msg = await callback.message.answer(
+        f"⏳ Генерирую отчёт по пулу {pool_id}..."
+    )
+
+    try:
+        await ReportService.send_pool_report_to_admin(pool_id=pool_id)
+        await progress_msg.edit_text(f"✅ Отчёт по пулу {pool_id} отправлен")
+    except Exception as e:
+        logger.exception("Ошибка test_report pool=%s: %s", pool_id, e)
+        await progress_msg.edit_text(f"❌ Ошибка: {e}")
 
 
 @router.message(Command(commands="_campushub_test_"), IsAdmin())

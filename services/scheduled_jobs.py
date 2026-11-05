@@ -227,7 +227,7 @@ async def direct_send_pool_job(recipients: list[int] | None = None, text: str = 
         recipients=[str(u) for u in target_users],
         text=f"<b>📊 Доступен новый опрос!</b>\n\n{first_q.pool_question}",
         reply_markup=kbd,
-        save_last_message=True,   # ← сохранит message_id для завтрашней чистки
+        save_last_message=True,  # ← сохранит message_id для завтрашней чистки
     )
     logger.info("direct_send_pool_job: ok=%s, failed=%s", ok, failed)
 
@@ -288,6 +288,8 @@ async def mark_as_deleted_pool_job() -> None:
             uuid=settings.MAIN_ADMIN,
             text=f"❌ Ошибка генерации отчёта по пулу {active_pool_id}: {e}",
         )
+
+
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
     now_in_minsk = datetime.now(ZoneInfo("Europe/Minsk"))
     """Регистрация всех периодических задач. Вызывать один раз при старте."""
