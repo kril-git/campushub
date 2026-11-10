@@ -33,7 +33,11 @@ class UserDAO(BaseDAO[User]):
 
     @classmethod
     async def is_registered(cls, session: AsyncSession, uuid: str) -> bool:
-        stmt = select(User.registration).where(User.uuid == uuid)
-        result: Result = await session.execute(stmt)
-        is_registered: bool = result.scalar()
-        return is_registered
+        """
+           Проверяет, зарегистрирован ли пользователь.
+           Возвращает False, если записи нет.
+           """
+        stmt = select(cls.model.registration).where(cls.model.uuid == uuid)
+        result = await session.execute(stmt)
+        registration = result.scalar_one_or_none()
+        return bool(registration)

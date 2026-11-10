@@ -150,17 +150,15 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
 
     #     Получаем активный пул если существует
     active_pool_id = await PoolService.get_active_pool_id(pool_category=PoolCategory.NONE)
-    # active_pool_id = await PoolService.get_active_pool_end_date(pool_category=PoolCategory.NONE)
     if active_pool_id is None:
         await send_message_text_to_user(uuid=str(uuid), text=f"Сегодня активного опроса нет.")
         return
     else:
-        # await broadcast_text_all_users()
         data = {}
         data.update({"complete_a_survey": "Пройти опрос"})
         data.update({"exit_complete_a_survey": "Потом"})
         kbd = create_i_kb_from_dict(data=data, adjust=1)
-        ok, failed = await broadcast_text_all_users(bot=bot,
+        ok, failed, errors = await broadcast_text_all_users(bot=bot,
                                                     recipients=settings.TEST_USERS,
                                                     text=text,
                                                     reply_markup=kbd,
@@ -222,7 +220,7 @@ async def direct_send_pool_job(recipients: list[int] | None = None, text: str = 
     )
 
     # 6. Рассылка — broadcast сам обходит получателей (без внешнего for!)
-    ok, failed = await broadcast_text_all_users(
+    ok, failed, errors = await broadcast_text_all_users(
         bot=bot,
         recipients=[str(u) for u in target_users],
         text=f"<b>📊 Доступен новый опрос!</b>\n\n{first_q.pool_question}",
@@ -231,14 +229,23 @@ async def direct_send_pool_job(recipients: list[int] | None = None, text: str = 
     )
     logger.info("direct_send_pool_job: ok=%s, failed=%s", ok, failed)
 
-    # 7. Уведомление админа (опционально)
+    # 7. Уведомление админа со списком ошибок
+    admin_text = (
+        f"📤 direct_send_pool_job завершён\n"
+        f"pool={active_pool_id}\n"
+        f"получателей={len(target_users)}\n"
+        f"ok={ok}\nfailed={failed}"
+    )
+
+    if errors:
+        # первые 10 ошибок
+        admin_text += "\n\n⚠️ Ошибки:\n" + "\n".join(errors[:10])
+        if len(errors) > 10:
+            admin_text += f"\n... и ещё {len(errors) - 10}"
+
     await send_message_text_to_user(
         uuid=str(settings.MAIN_ADMIN),
-        text=(
-            f"📤 direct_send_pool_job завершён\n"
-            f"pool={active_pool_id}\n"
-            f"ok={ok}\nfailed={failed}"
-        ),
+        text=admin_text,
     )
 
 
@@ -314,12 +321,25 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     #                   },
     #                   )
 
-    scheduler.add_job(daily_send_pool_job,
-                      trigger=CronTrigger(hour=9, minute=30, timezone=ZoneInfo("Europe/Minsk")),
+    # scheduler.add_job(daily_send_pool_job,
+    #                   trigger=CronTrigger(hour=9, minute=30, timezone=ZoneInfo("Europe/Minsk")),
+    #                   # каждый день 9:00 Europe/Minsk
+    #                   id="daily_send_pool_job",
+    #                   kwargs={
+    #                       "uuid": settings.TEST_USERS,
+    #                       "text": f"Вам необходимо пройти опрос",
+    #                   },
+    #                   replace_existing=True,
+    #                   misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
+    #                   coalesce=True,  # не запускать 10 раз подряд после простоя
+    #                   max_instances=1, )  # не пересекать запуски
+
+    scheduler.add_job(direct_send_pool_job,
+                      trigger=CronTrigger(hour=9, minute=36, timezone=ZoneInfo("Europe/Minsk")),
                       # каждый день 9:00 Europe/Minsk
-                      id="daily_send_pool_job",
+                      id="direct_send_pool_job",
                       kwargs={
-                          "uuid": settings.TEST_USERS,
+                          "recipients": settings.TEST_USERS,
                           "text": f"Вам необходимо пройти опрос",
                       },
                       replace_existing=True,
@@ -327,11 +347,11 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
                       coalesce=True,  # не запускать 10 раз подряд после простоя
                       max_instances=1, )  # не пересекать запуски
 
-    scheduler.add_job(direct_send_pool_job,
-                      "date",
-                      run_date=datetime.now() + timedelta(minutes=1),
-                      kwargs={
-                          "recipients": settings.TEST_USERS,
-                          "text": "Проверка выполнения задания по рассписани, сообщение только админам",
-                      },
-                      )
+    # scheduler.add_job(direct_send_pool_job,
+    #                   "date",
+    #                   run_date=datetime.now() + timedelta(minutes=1),
+    #                   kwargs={
+    #                       "recipients": settings.TEST_USERS,
+    #                       "text": "Проверка выполнения задания по рассписани, сообщение только админам",
+    #                   },
+    #                   )

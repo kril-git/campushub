@@ -95,7 +95,7 @@ class BroadcastScene(Scene, state="broadcast"):
         await callback.message.edit_text("🚀 Рассылка запущена...")
         await callback.answer()
         async with ChatActionSender.typing(bot=callback.bot, chat_id=callback.message.chat.id):
-            ok, failed = await broadcast_text_all_users(callback.bot, recipients, text)
+            ok, failed, errors = await broadcast_text_all_users(callback.bot, recipients, text)
 
         await callback.message.edit_text(
             f"✅ Готово.\n\n"

@@ -76,8 +76,10 @@ async def broadcast_text_all_users(bot: Bot,
                                            ForceReply |
                                            None
                                    ) = None,
-                                   save_last_message: bool = False, ) -> tuple[int, int]:
+                                   save_last_message: bool = False, ) -> tuple[int, int, list[dict]]:
     ok = failed = 0
+    errors: list[dict] = []
+
     for raw_id in recipients:
         chat_id = _to_chat_id(raw_id)
         if chat_id is None:
@@ -92,7 +94,6 @@ async def broadcast_text_all_users(bot: Bot,
                     disable_notification=True,
                     reply_markup=reply_markup,
                     parse_mode=ParseMode.HTML,
-                    # parse_mode="HTML",
                 )
         except TelegramRetryAfter as e:
             logger.warning("Flood limit, sleep %s", e.retry_after)
@@ -108,10 +109,37 @@ async def broadcast_text_all_users(bot: Bot,
             except TelegramAPIError as err:
                 logger.error("Retry failed for %s: %s", chat_id, err)
                 failed += 1
+                errors.append({"chat_id": chat_id,
+                               "reason": "retry_failed",
+                               "error": str(err),
+                               })
             continue
-        except (TelegramForbiddenError, TelegramBadRequest, TelegramAPIError) as e:
-            logger.error("Error sending to %s: %s", chat_id, e)
+        except TelegramForbiddenError as e:
+            logger.warning("Blocked by user %s: %s", chat_id, e)
             failed += 1
+            errors.append({
+                "chat_id": chat_id,
+                "reason": "blocked",
+                "error": str(e),
+            })
+            continue
+        except TelegramBadRequest as e:
+            logger.warning("Bad request for %s: %s", chat_id, e)
+            failed += 1
+            errors.append({
+                "chat_id": chat_id,
+                "reason": "bad_request",
+                "error": str(e),
+            })
+            continue
+        except TelegramAPIError as e:
+            logger.error("API error for %s: %s", chat_id, e)
+            failed += 1
+            errors.append({
+                "chat_id": chat_id,
+                "reason": "api_error",
+                "error": str(e),
+            })
             continue
 
             # Если сообщение успешно ушло пользователю
@@ -126,10 +154,9 @@ async def broadcast_text_all_users(bot: Bot,
                         user_state = FSMContext(storage=AppStorage.storage, key=storage_key)
                         current_data = await user_state.get_data()
                         current_data[LAST_BROADCAST_MSG_ID] = sent_message.message_id
-                        # await user_state.set_data(current_data)
                         await user_state.update_data(current_data)
                     except Exception as ex:
                         logger.error("Ошибка сохранения message_id для %s: %s", chat_id, ex, exc_info=True)
         await asyncio.sleep(0.05)  # антифлуд
 
-    return ok, failed
+    return ok, failed, errors
