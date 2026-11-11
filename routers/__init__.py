@@ -27,6 +27,9 @@ from scenes.complete_a_survey_scene import CompleteSurvey
 from scenes import direct_survey_scene
 from scenes import broadcast_media_scene
 
+from scenes import load_quiz_scene
+from scenes.load_quiz_scene import LoadQuizScene
+
 router = Router(name=__name__)
 
 # ✅ Регистрируем ВСЕ хэндлеры и внутренние роутеры сцен в правильном порядке
@@ -75,6 +78,19 @@ router.message.register(
     Command("broadcast"),
 )
 
+# Вход через inline-кнопку
+router.callback_query.register(
+    LoadQuizScene.as_handler(),
+    F.data == "load_quiz:start",
+)
+
+# Вход через команду (для теста)
+router.message.register(
+    LoadQuizScene.as_handler(),
+    Command("load_quiz"),
+)
+
+
 
 router.include_routers(
     fallback_router,
@@ -92,4 +108,5 @@ def get_scenes() -> list[type[Scene]]:
         complete_a_survey_scene.CompleteSurvey,
         direct_survey_scene.DirectSurveyScene,
         broadcast_media_scene.BroadcastMediaScene,
+        load_quiz_scene.LoadQuizScene,
     ]

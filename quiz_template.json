@@ -1,0 +1,29 @@
+{
+  "title": "Квиз по профилактике",
+  "description": "Ответьте на 2 вопроса",
+  "start_date": "2026-11-15",
+  "end_date": "2026-11-20",
+  "show_correct_after_answer": true,
+  "show_result_to_user": true,
+  "questions": [
+    {
+      "number": 1,
+      "text": "Что такое суицид?",
+      "comment": "Суицид — это осознанное лишение себя жизни. Не болезнь.",
+      "answers": [
+        {"number": 1, "text": "Осознанное лишение себя жизни", "is_correct": true},
+        {"number": 2, "text": "Болезнь", "is_correct": false},
+        {"number": 3, "text": "Не знаю", "is_correct": false}
+      ]
+    },
+    {
+      "number": 2,
+      "text": "Сколько вам лет?",
+      "answers": [
+        {"number": 1, "text": "Меньше 18", "is_correct": false},
+        {"number": 2, "text": "18–25", "is_correct": true},
+        {"number": 3, "text": "Больше 25", "is_correct": false}
+      ]
+    }
+  ]
+}

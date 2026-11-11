@@ -4,7 +4,7 @@ from aiogram import Router, F, flags, types
 from aiogram.enums import ChatAction
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.chat_action import ChatActionSender
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -13,6 +13,7 @@ from core.config import settings
 from database.admin_crud import get_user_all, set_role, export_users_to_excel, get_personal_record_short
 from keyboards.inline_keyboard import create_i_kb_from_dict
 from lexicon.lexicon import LEXICON_ADMIN_TEST
+from services.EnumQuizStatus import QuizStatus
 from services.personal_record_service import get_personal_record_short_lines, get_personal_record_short_lines_render
 from database.dao.personal_record_dao import PersonalRecordDAO
 from database.users_crud import get_user_by_uuid
@@ -21,6 +22,7 @@ from keyboards.reply_keyboar import r_kb_cancel
 from models import User
 from services.admin_services import send_users_list_4096, split_into_chunks, send_chunks, split_strings_into_chunks
 from services.pool_service import PoolService
+from services.quiz_service import QuizService
 from services.render import render_users
 from services.report_service import ReportService
 from states.admin_states import FSMSetUserToAdmin
@@ -205,3 +207,154 @@ async def cmd_test_report(message: Message):
 async def cancel(message: Message, state: FSMContext):
     await message.answer(text=f"ОК")
     await state.clear()
+
+
+# ==================== Список квизов ====================
+
+@router.callback_query(F.data == "admin:quizzes")
+async def on_quizzes_list(callback: CallbackQuery):
+    if str(callback.from_user.id) not in settings.ADMINS:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    await callback.answer("⏳ Загружаю...")
+
+    quizzes = await QuizService.get_recent(limit=5)
+
+    if not quizzes:
+        await callback.message.edit_text(
+            "📝 <b>Квизы</b>\n\n"
+            "Нет квизов. Загрузите первый через /load_quiz.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📄 Загрузить квиз", callback_data="load_quiz:start")],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:menu")],
+            ]),
+        )
+        return
+
+    builder = InlineKeyboardBuilder()
+    for quiz in quizzes:
+        icon = _quiz_status_icon(quiz.status)
+        dates = f"{quiz.start_date:%d.%m}—{quiz.end_date:%d.%m}"
+        title = (quiz.title or "")[:30]
+        builder.button(
+            text=f"{icon} {quiz.id}: {title} ({quiz.status.value}, {dates})",
+            callback_data=f"admin:quiz:{quiz.id}",
+        )
+    builder.adjust(1)
+
+    builder.row(
+        InlineKeyboardButton(text="📄 Загрузить квиз", callback_data="load_quiz:start"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:menu"),
+    )
+
+    await callback.message.edit_text(
+        f"📝 <b>Квизы</b> (последние {len(quizzes)}):",
+        parse_mode="HTML",
+        reply_markup=builder.as_markup(),
+    )
+
+
+def _quiz_status_icon(status: QuizStatus) -> str:
+    """Иконка статуса для кнопки."""
+    if status == QuizStatus.ACTIVE:
+        return "🟢"
+    if status == QuizStatus.DRAFT:
+        return "⚪"
+    if status == QuizStatus.FINISHED:
+        return "🔴"
+    return "❓"
+
+
+# ==================== Клик на квиз ====================
+
+@router.callback_query(F.data.startswith("admin:quiz:"))
+async def on_quiz_click(callback: CallbackQuery):
+    if str(callback.from_user.id) not in settings.ADMINS:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    _, _, quiz_id_str = callback.data.split(":")
+    try:
+        quiz_id = int(quiz_id_str)
+    except ValueError:
+        await callback.answer("Неверный ID", show_alert=True)
+        return
+
+    quiz = await QuizService.get_quiz(quiz_id=quiz_id)
+    if not quiz:
+        await callback.answer("Квиз не найден", show_alert=True)
+        return
+
+    # Действия по статусу
+    if quiz.status == QuizStatus.DRAFT:
+        # DRAFT → активировать
+        await callback.answer(f"⏳ Активирую квиз {quiz_id}...")
+        await QuizService.activate_quiz(quiz_id=quiz_id)
+        await callback.message.edit_text(
+            f"✅ <b>Квиз {quiz_id} активирован</b>\n\n"
+            f"Название: {quiz.title}\n"
+            f"Период: {quiz.start_date:%d.%m.%Y}—{quiz.end_date:%d.%m.%Y}\n\n"
+            f"Теперь можно запустить рассылку.",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="🚀 Запустить рассылку",
+                    callback_data=f"admin:quiz:send:{quiz_id}",
+                )],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
+            ]),
+        )
+
+    elif quiz.status == QuizStatus.ACTIVE:
+        # ACTIVE → запустить рассылку
+        await callback.answer(f"⏳ Запускаю рассылку квиза {quiz_id}...")
+        from services.scheduled_jobs import send_quiz_job
+        await send_quiz_job(quiz_id=quiz_id)
+        await callback.message.edit_text(
+            f"✅ <b>Рассылка квиза {quiz_id} запущена</b>\n\n"
+            f"Название: {quiz.title}\n"
+            f"Период: {quiz.start_date:%d.%m.%Y}—{quiz.end_date:%d.%m.%Y}",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
+            ]),
+        )
+
+    # elif quiz.status == QuizStatus.FINISHED:
+    #     # FINISHED → показать отчёт
+    #     await callback.answer(f"⏳ Генерирую отчёт...")
+    #     from services.quiz_report_service import QuizReportService
+    #     await QuizReportService.send_report_to_admin(quiz_id=quiz_id)
+    #     await callback.message.edit_text(
+    #         f"✅ <b>Отчёт по квизу {quiz_id} отправлен</b>",
+    #         parse_mode="HTML",
+    #         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+    #             [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
+    #         ]),
+    #     )
+
+
+# ==================== Кнопка «Назад» в меню ====================
+
+@router.callback_query(F.data == "admin:menu")
+async def on_admin_menu(callback: CallbackQuery):
+    if str(callback.from_user.id) not in settings.ADMINS:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    await callback.answer()
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📝 Квизы", callback_data="admin:quizzes")],
+        [InlineKeyboardButton(text="📄 Загрузить квиз", callback_data="load_quiz:start")],
+        [InlineKeyboardButton(text="📊 Тест отчёта", callback_data="test_report:28")],
+    ])
+    await callback.message.edit_text(
+        "🔧 <b>Админ-панель</b>",
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
