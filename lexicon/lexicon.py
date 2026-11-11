@@ -133,6 +133,7 @@ LEXICON_ADMIN_TEST: dict[str, str] = {
     "complete_a_survey":  "Пройти опрос",
     "test_report": "Проверка отчета на диск",
     "_get_recent_pools_": "Показать последние 5 опросов",
+    "broadcast:start": "Создать рассылку Фото и текст"
 }
 
 LEXICON_USER_HELP: dict[str, dict[str, str]] = {

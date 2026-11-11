@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from database.connection import readonly
 from database.dao.recipients_dao import RecipientsDAO
 
@@ -15,8 +16,10 @@ class RecipientsService:
         """
                 Возвращает список telegram_id всех зарегистрированных пользователей.
                 Фильтрует пустые значения (страховка).
+                Заглушка для тестового режима в боевом окружении False
         """
-
+        # if settings.TEST_MODE:
+        #     return list(settings.TEST_USERS)
         raw = await RecipientsDAO.get_real_recipients(session=session)
         recipients = [str(u) for u in raw if u and str(u).strip()]
         logger.info("RecipientsService.get_all_telegram_ids: %d валидных из %d", len(recipients), len(raw))
@@ -37,25 +40,6 @@ class RecipientsService:
             pool_id, len(recipients), len(raw),
         )
         return recipients
-
-    @staticmethod
-    async def get_recipients_all(
-            override: list[str] | None = None,
-    ) -> list[str]:
-        """
-        Оркестратор: получатели по режиму.
-        - override=[...] — явный список (ручной запуск);
-        - TEST_MODE=True → TEST_USERS;
-        - TEST_MODE=False → реальные из БД;
-        - force_real=True — игнорировать TEST_MODE.
-        """
-        if override is not None:
-            logger.info("get_recipients: override (%d)", len(override))
-            return override
-
-        real = await RecipientsService.get_all_telegram_ids()
-        logger.info("get_recipients: TEST_MODE=False → real (%d)", len(real))
-        return real
 
     @staticmethod
     async def get_recipients(
@@ -82,6 +66,9 @@ class RecipientsService:
 
             logger.info("get_recipients: override (%d), skip_filter=%s", len(override), skip_filter)
             return [str(u) for u in override]
+        if settings.TEST_MODE:
+            logger.info("get_recipients: TEST_MODE=True → TEST_USERS (%d)", len(settings.TEST_USERS))
+            return list(settings.TEST_USERS)
 
         if pool_id is not None:
             real = await RecipientsService.get_not_completed_telegram_ids(pool_id=pool_id)

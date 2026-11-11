@@ -20,11 +20,6 @@ logger = logging.getLogger(__name__)
 LAST_BROADCAST_MSG_ID = "last_broadcast_msg_id"
 
 
-async def send_message_io_and_mio_moglie():
-    user_id = settings.TEST_USERS
-    for id in user_id:
-        await send_message_text_to_user(uuid=id, text="Доброе утро!")
-
 
 async def send_message_text_to_user(
         uuid: str,
@@ -158,5 +153,146 @@ async def broadcast_text_all_users(bot: Bot,
                     except Exception as ex:
                         logger.error("Ошибка сохранения message_id для %s: %s", chat_id, ex, exc_info=True)
         await asyncio.sleep(0.05)  # антифлуд
+
+    return ok, failed, errors
+
+
+async def broadcast_photo_all_users(
+    bot: Bot,
+    recipients: list[str],
+    photo: str,                      # file_id или URL
+    text: str = "",
+    reply_markup: (
+        InlineKeyboardMarkup |
+        ReplyKeyboardMarkup |
+        ReplyKeyboardRemove |
+        ForceReply |
+        None
+    ) = None,
+    save_last_message: bool = False,
+) -> tuple[int, int, list[dict]]:
+    """
+    Рассылка фото (опционально с текстом).
+
+    - Если text ≤ 1024 символов → 1 сообщение (фото + caption).
+    - Если text > 1024 → 2 сообщения (фото без caption, затем текст отдельно).
+    - Если text пустой → только фото.
+    """
+    ok = failed = 0
+    errors: list[dict] = []
+
+    # Telegram ограничение: caption ≤ 1024 символа
+    use_caption = bool(text) and len(text) <= 1024
+
+    for raw_id in recipients:
+        chat_id = _to_chat_id(raw_id)
+        if chat_id is None:
+            failed += 1
+            errors.append({"raw_id": raw_id, "reason": "invalid_chat_id"})
+            continue
+
+        sent_message = None
+        try:
+            async with ChatActionSender.upload_photo(bot=bot, chat_id=chat_id):
+                if use_caption:
+                    # 1 сообщение: фото + caption
+                    sent_message = await bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        parse_mode=ParseMode.HTML,
+                        disable_notification=True,
+                    )
+                elif text:
+                    # 2 сообщения: фото, затем текст
+                    await bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        disable_notification=True,
+                    )
+                    sent_message = await bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        reply_markup=reply_markup,
+                        parse_mode=ParseMode.HTML,
+                        disable_notification=True,
+                    )
+                else:
+                    # Только фото
+                    sent_message = await bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        reply_markup=reply_markup,
+                        disable_notification=True,
+                    )
+        except TelegramRetryAfter as e:
+            logger.warning("Flood limit, sleep %s", e.retry_after)
+            await asyncio.sleep(e.retry_after)
+            try:
+                if use_caption:
+                    sent_message = await bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        caption=text,
+                        reply_markup=reply_markup,
+                        disable_notification=True,
+                    )
+                elif text:
+                    await bot.send_photo(chat_id=chat_id, photo=photo, disable_notification=True)
+                    sent_message = await bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        reply_markup=reply_markup,
+                        disable_notification=True,
+                    )
+                else:
+                    sent_message = await bot.send_photo(
+                        chat_id=chat_id, photo=photo, reply_markup=reply_markup,
+                        disable_notification=True,
+                    )
+                ok += 1
+            except TelegramAPIError as err:
+                logger.error("Retry failed for %s: %s", chat_id, err)
+                failed += 1
+                errors.append({"chat_id": chat_id, "reason": "retry_failed", "error": str(err)})
+            continue
+        except TelegramForbiddenError as e:
+            logger.warning("Blocked by user %s: %s", chat_id, e)
+            failed += 1
+            errors.append({"chat_id": chat_id, "reason": "blocked", "error": str(e)})
+            continue
+        except TelegramBadRequest as e:
+            logger.warning("Bad request for %s: %s", chat_id, e)
+            failed += 1
+            errors.append({"chat_id": chat_id, "reason": "bad_request", "error": str(e)})
+            continue
+        except TelegramAPIError as e:
+            logger.error("API error for %s: %s", chat_id, e)
+            failed += 1
+            errors.append({"chat_id": chat_id, "reason": "api_error", "error": str(e)})
+            continue
+
+        if sent_message:
+            ok += 1
+            if save_last_message:
+                if not AppStorage.is_ready():
+                    logger.error("broadcast: AppStorage не инициализирован")
+                else:
+                    try:
+                        storage_key = StorageKey(
+                            bot_id=bot.id, chat_id=chat_id,
+                            user_id=chat_id, destiny="default",
+                        )
+                        user_state = FSMContext(storage=AppStorage.storage, key=storage_key)
+                        current_data = await user_state.get_data()
+                        current_data[LAST_BROADCAST_MSG_ID] = sent_message.message_id
+                        await user_state.update_data(current_data)
+                    except Exception as ex:
+                        logger.error(
+                            "Ошибка сохранения message_id для %s: %s",
+                            chat_id, ex, exc_info=True,
+                        )
+        await asyncio.sleep(0.05)   # антифлуд
 
     return ok, failed, errors

@@ -18,6 +18,7 @@ from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
 from services.recipients_services import RecipientsService
 from services.report_service import ReportService
+from services.scheduled_broadcast_service import ScheduledBroadcastService
 from services.sending_service import send_message_text_to_user, broadcast_text_all_users, LAST_BROADCAST_MSG_ID
 from services.services import _to_chat_id
 from utils.cleanup_old_survey_messages import cleanup_old_survey_messages
@@ -159,11 +160,11 @@ async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> 
         data.update({"exit_complete_a_survey": "Потом"})
         kbd = create_i_kb_from_dict(data=data, adjust=1)
         ok, failed, errors = await broadcast_text_all_users(bot=bot,
-                                                    recipients=settings.TEST_USERS,
-                                                    text=text,
-                                                    reply_markup=kbd,
-                                                    save_last_message=True,
-                                                    )
+                                                            recipients=settings.TEST_USERS,
+                                                            text=text,
+                                                            reply_markup=kbd,
+                                                            save_last_message=True,
+                                                            )
         await send_message_text_to_user(uuid=settings.MAIN_ADMIN,
                                         text=f"Отправлен опрос\n"
                                              f"ok - {ok}\n"
@@ -247,6 +248,16 @@ async def direct_send_pool_job(recipients: list[int] | None = None, text: str = 
         uuid=str(settings.MAIN_ADMIN),
         text=admin_text,
     )
+
+
+async def process_scheduled_broadcasts() -> None:
+    """Проверяет pending-рассылки и отправляет те, что пора."""
+    try:
+        result = await ScheduledBroadcastService.process_pending()
+        if result["sent"] or result["failed"]:
+            logger.info("process_scheduled_broadcasts: %s", result)
+    except Exception as e:
+        logger.exception("process_scheduled_broadcasts: ошибка: %s", e)
 
 
 async def mark_as_deleted_pool_job() -> None:
@@ -346,6 +357,14 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
                       misfire_grace_time=3600,  # если бот лежал — догонит в течение часа
                       coalesce=True,  # не запускать 10 раз подряд после простоя
                       max_instances=1, )  # не пересекать запуски
+
+    scheduler.add_job(process_scheduled_broadcasts,
+                      "interval", minutes=1,
+                      id="process_scheduled_broadcasts",
+                      replace_existing=True,
+                      max_instances=1,
+                      coalesce=True,
+                      )
 
     # scheduler.add_job(direct_send_pool_job,
     #                   "date",

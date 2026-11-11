@@ -16,7 +16,7 @@ import logging
 
 from database.db_helper import DatabaseHelper, db_helper
 from services.scheduled_jobs import register_jobs
-from services.sending_service import send_message_text_to_user, send_message_io_and_mio_moglie
+# from services.sending_service import send_message_text_to_user, send_message_io_and_mio_moglie
 
 logger = logging.getLogger(__name__)
 

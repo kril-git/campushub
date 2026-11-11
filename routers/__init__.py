@@ -12,6 +12,7 @@ from handlers.survey_starter import router as survey_starter_router
 from handlers.fallback_handlers import router as fallback_router
 
 from scenes import registration_scene
+from scenes.broadcast_media_scene import BroadcastMediaScene
 from scenes.registration_scene import RegistrationScene
 
 from scenes import broadcast_text_scene
@@ -24,6 +25,7 @@ from scenes import complete_a_survey_scene
 from scenes.complete_a_survey_scene import CompleteSurvey
 
 from scenes import direct_survey_scene
+from scenes import broadcast_media_scene
 
 router = Router(name=__name__)
 
@@ -61,6 +63,19 @@ router.callback_query.register(
     F.data == "complete_a_survey"
 )
 
+# ✅ Вход в сцену через inline-кнопку
+router.callback_query.register(
+    BroadcastMediaScene.as_handler(),
+    F.data == "broadcast:start",
+)
+
+# ✅ Опционально: вход через команду (для теста)
+router.message.register(
+    BroadcastMediaScene.as_handler(),
+    Command("broadcast"),
+)
+
+
 router.include_routers(
     fallback_router,
     cancel_router,
@@ -75,5 +90,6 @@ def get_scenes() -> list[type[Scene]]:
         broadcast_text_scene.BroadcastScene,
         load_pool_json_scene.LoadPoolJsonScene,
         complete_a_survey_scene.CompleteSurvey,
-        direct_survey_scene.DirectSurveyScene,  # Добавили сюда! 🔥
+        direct_survey_scene.DirectSurveyScene,
+        broadcast_media_scene.BroadcastMediaScene,
     ]

@@ -414,3 +414,30 @@ sudo chflags -R nouchg #снимает атрибут защиты файла р
 Тесты  - в личном кабинете студента.
 Заранее спасибо
 С уважением, твой куратор Кристина Игоревна
+
+
+
+# Grep cheatsheet
+
+## Базовые (использую 90% времени)
+grep -rn "pattern" --include="*.py" .          # рекурсивно + номера + только .py
+grep -rn -C 2 "pattern" --include="*.py" .     # + 2 строки контекста
+grep -rl "pattern" --include="*.py" .          # только файлы (для рефакторинга)
+grep -rnw "user" --include="*.py" .            # только целое слово
+grep -rni "pattern" --include="*.py" .         # игнор регистра
+
+## Полезные
+grep -rn "def get_recipients" --include="*.py" .   # найти определение
+grep -rn "\.get_recipients" --include="*.py" .     # найти вызовы (точка!)
+grep -rn "pattern" . | grep -v "await"             # найти без await (баг)
+grep -rn "TODO\|FIXME" --include="*.py" .          # все заметки
+grep -rn "print(" --include="*.py" . | grep -v "noqa"   # отладочные print
+
+## Контекст
+grep -A 3 "pattern" .   # 3 строки после
+grep -B 3 "pattern" .   # 3 строки до
+grep -C 3 "pattern" .   # 3 до и после
+
+## Исключить
+--exclude-dir=__pycache__ --exclude-dir=.venv
+--exclude="*.pyc"
