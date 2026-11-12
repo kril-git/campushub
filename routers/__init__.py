@@ -13,6 +13,7 @@ from handlers.fallback_handlers import router as fallback_router
 
 from scenes import registration_scene
 from scenes.broadcast_media_scene import BroadcastMediaScene
+from scenes.quiz_scene import QuizScene
 from scenes.registration_scene import RegistrationScene
 
 from scenes import broadcast_text_scene
@@ -29,6 +30,9 @@ from scenes import broadcast_media_scene
 
 from scenes import load_quiz_scene
 from scenes.load_quiz_scene import LoadQuizScene
+
+from scenes import quiz_scene
+from scenes.quiz_scene import QuizScene
 
 router = Router(name=__name__)
 
@@ -90,7 +94,10 @@ router.message.register(
     Command("load_quiz"),
 )
 
-
+router.callback_query.register(
+    QuizScene.as_handler(),
+    F.data.startswith("quiz:start:"),
+)
 
 router.include_routers(
     fallback_router,
@@ -109,4 +116,5 @@ def get_scenes() -> list[type[Scene]]:
         direct_survey_scene.DirectSurveyScene,
         broadcast_media_scene.BroadcastMediaScene,
         load_quiz_scene.LoadQuizScene,
+        quiz_scene.QuizScene,
     ]

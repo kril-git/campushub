@@ -2,6 +2,8 @@ import logging
 import re
 from datetime import datetime
 
+from services.EnumQuizStatus import QuizStatus
+
 # from services.broadcast_text import logger
 logger = logging.getLogger(__name__)
 
@@ -26,3 +28,14 @@ def _to_chat_id(value: str) -> int | None:
 
 def _is_date(text: str) -> bool:
     return bool(DATE_REGEX.match(text.strip()))
+
+
+def _quiz_status_icon(status: QuizStatus) -> str:
+    """Иконка статуса для кнопки."""
+    if status == QuizStatus.ACTIVE:
+        return "🟢"
+    if status == QuizStatus.DRAFT:
+        return "⚪"
+    if status == QuizStatus.FINISHED:
+        return "🔴"
+    return "❓"

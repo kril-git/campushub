@@ -6,7 +6,7 @@ from database.dao.quiz_dao import (
     QuizDAO, QuizQuestionDAO, QuizAnswerDAO,
     QuizResponseDAO, QuizUserDAO,
 )
-from models import Quiz, QuizQuestion, QuizAnswer
+from models import Quiz, QuizQuestion, QuizAnswer, QuizUser, QuizResponse
 from services.EnumQuizStatus import QuizStatus
 from services.services import get_timestamp
 
@@ -56,6 +56,38 @@ class QuizService:
             )
 
         return errors
+
+    @staticmethod
+    @readonly
+    async def get_user(
+            session, user_uuid: str, quiz_id: int,
+    ) -> QuizUser | None:
+        """Прогресс пользователя по квизу."""
+        return await QuizUserDAO.get_by_user_and_quiz(
+            session=session, user_uuid=user_uuid, quiz_id=quiz_id,
+        )
+
+    @staticmethod
+    @readonly
+    async def get_next_question(
+            session, user_uuid: str, quiz_id: int,
+    ) -> QuizQuestion | None:
+        """
+        Следующий вопрос для пользователя.
+        - QuizUser нет → вопрос 1.
+        - QuizUser.step=N → вопрос N+1.
+        - Вопросов больше нет → None.
+        """
+        quiz_user = await QuizUserDAO.get_by_user_and_quiz(
+            session=session, user_uuid=user_uuid, quiz_id=quiz_id,
+        )
+        current_step = quiz_user.step if quiz_user else 0
+
+        return await QuizQuestionDAO.get_by_quiz_and_after_number(
+            session=session,
+            quiz_id=quiz_id,
+            after_number=current_step,
+        )
 
     @staticmethod
     def validate_json(data: dict) -> list[str]:
@@ -261,6 +293,131 @@ class QuizService:
         """Получить квиз с вопросами и ответами."""
         return await QuizDAO.get_with_questions(session=session, quiz_id=quiz_id)
 
+        # ==================== Прохождение ====================
+
+        @staticmethod
+        @readonly
+        async def get_next_question(
+                session, user_uuid: str, quiz_id: int,
+        ) -> QuizQuestion | None:
+            """
+            Следующий вопрос для пользователя.
+            - QuizUser нет → вопрос 1.
+            - QuizUser.step=N → вопрос N+1.
+            - Вопросов больше нет → None.
+            """
+            quiz_user = await QuizUserDAO.get_by_user_and_quiz(
+                session=session, user_uuid=user_uuid, quiz_id=quiz_id,
+            )
+            current_step = quiz_user.step if quiz_user else 0
+
+            return await QuizQuestionDAO.get_by_quiz_and_after_number(
+                session=session,
+                quiz_id=quiz_id,
+                after_number=current_step,
+            )
+
+        @staticmethod
+        @readonly
+        async def get_user(
+                session, user_uuid: str, quiz_id: int,
+        ) -> QuizUser | None:
+            """Прогресс пользователя по квизу."""
+            return await QuizUserDAO.get_by_user_and_quiz(
+                session=session, user_uuid=user_uuid, quiz_id=quiz_id,
+            )
+
+        @staticmethod
+        @connection
+        async def save_answer(
+                session,
+                user_uuid: str,
+                quiz_id: int,
+                question_id: int,
+                answer_id: int,
+        ) -> dict:
+            """
+            Сохраняет ответ пользователя.
+            Возвращает:
+            - {"is_correct": bool, "correct_text": str | None, "comment": str | None}
+            """
+            # 1. Правильный ли ответ
+            answer = await QuizAnswerDAO.get_by_id(session=session, id_=answer_id)
+            if not answer:
+                raise ValueError(f"Ответ id={answer_id} не найден")
+            is_correct = answer.is_correct
+
+            # 2. Текущий QuizUser (или создаём)
+            quiz_user = await QuizUserDAO.get_by_user_and_quiz(
+                session=session, user_uuid=user_uuid, quiz_id=quiz_id,
+            )
+            if quiz_user is None:
+                quiz_user = QuizUser(
+                    quiz_id=quiz_id,
+                    user_uuid=user_uuid,
+                    step=0,
+                    correct_count=0,
+                    total_count=0,
+                )
+                quiz_user = await QuizUserDAO.add(session=session, data=quiz_user)
+
+            # 3. Сохраняем QuizResponse
+            response = QuizResponse(
+                quiz_id=quiz_id,
+                user_uuid=user_uuid,
+                question_id=question_id,
+                answer_id=answer_id,
+                is_correct=is_correct,
+                step=quiz_user.step + 1,
+            )
+            await QuizResponseDAO.add(session=session, data=response)
+
+            # 4. Обновляем QuizUser
+            quiz_user.step += 1
+            quiz_user.total_count += 1
+            if is_correct:
+                quiz_user.correct_count += 1
+            quiz_user.last_activity_at = datetime.now()
+
+            # 5. Если это последний вопрос — end_quiz=True
+            total_questions = await QuizQuestionDAO.count_by_quiz(
+                session=session, quiz_id=quiz_id,
+            )
+            if quiz_user.step >= total_questions:
+                quiz_user.end_quiz = True
+                quiz_user.completed_at = datetime.now()
+
+            # 6. Правильный ответ (для показа, если неправильно)
+            correct_answer = None
+            if not is_correct:
+                correct_answer = await QuizAnswerDAO.get_correct(
+                    session=session, question_id=question_id,
+                )
+
+            # 7. Комментарий к вопросу
+            question = await QuizQuestionDAO.get_by_id(
+                session=session, id_=question_id,
+            )
+            comment = question.comment if question else None
+
+            logger.info(
+                "save_answer: user=%s, quiz=%s, question=%s, is_correct=%s",
+                user_uuid, quiz_id, question_id, is_correct,
+            )
+            return {
+                "is_correct": is_correct,
+                "correct_text": correct_answer.text if correct_answer else None,
+                "comment": comment,
+            }
+
+    @staticmethod
+    @readonly
+    async def get_completed_user_uuids(session, quiz_id: int) -> set[str]:
+        """Кто уже завершил квиз."""
+        return await QuizUserDAO.get_completed_user_uuids(
+            session=session, quiz_id=quiz_id,
+        )
+
     # ==================== Чтение (для будущего) ====================
 
     @staticmethod
@@ -276,3 +433,88 @@ class QuizService:
         if now is None:
             now = datetime.now()
         return await QuizDAO.get_active_with_questions(session=session, now=now)
+
+
+#========
+
+    @staticmethod
+    @connection
+    async def save_answer(
+        session,
+        user_uuid: str,
+        quiz_id: int,
+        question_id: int,
+        answer_id: int,
+    ) -> dict:
+        """
+        Сохраняет ответ пользователя.
+        Возвращает {"is_correct", "correct_text", "comment"}.
+        """
+        # 1. Правильный ли ответ
+        answer = await QuizAnswerDAO.get_by_id(session=session, id_=answer_id)
+        if not answer:
+            raise ValueError(f"Ответ id={answer_id} не найден")
+        is_correct = answer.is_correct
+
+        # 2. QuizUser (или создаём)
+        quiz_user = await QuizUserDAO.get_by_user_and_quiz(
+            session=session, user_uuid=user_uuid, quiz_id=quiz_id,
+        )
+        if quiz_user is None:
+            quiz_user = QuizUser(
+                quiz_id=quiz_id,
+                user_uuid=user_uuid,
+                step=0,
+                correct_count=0,
+                total_count=0,
+            )
+            quiz_user = await QuizUserDAO.add(session=session, data=quiz_user)
+
+        # 3. QuizResponse
+        response = QuizResponse(
+            quiz_id=quiz_id,
+            user_uuid=user_uuid,
+            question_id=question_id,
+            answer_id=answer_id,
+            is_correct=is_correct,
+            step=quiz_user.step + 1,
+        )
+        await QuizResponseDAO.add(session=session, data=response)
+
+        # 4. Обновляем QuizUser
+        quiz_user.step += 1
+        quiz_user.total_count += 1
+        if is_correct:
+            quiz_user.correct_count += 1
+        quiz_user.last_activity_at = datetime.now()
+
+        # 5. Если последний вопрос — end_quiz=True
+        total_questions = await QuizQuestionDAO.count_by_quiz(
+            session=session, quiz_id=quiz_id,
+        )
+        if quiz_user.step >= total_questions:
+            quiz_user.end_quiz = True
+            quiz_user.completed_at = datetime.now()
+
+        # 6. Правильный ответ (для показа)
+        correct_answer = None
+        if not is_correct:
+            correct_answer = await QuizAnswerDAO.get_correct(
+                session=session, question_id=question_id,
+            )
+
+        # 7. Комментарий
+        question = await QuizQuestionDAO.get_by_id(
+            session=session, id_=question_id,
+        )
+        comment = question.comment if question else None
+
+        logger.info(
+            "save_answer: user=%s, quiz=%s, question=%s, is_correct=%s",
+            user_uuid, quiz_id, question_id, is_correct,
+        )
+        return {
+            "is_correct": is_correct,
+            "correct_text": correct_answer.text if correct_answer else None,
+            "comment": comment,
+        }

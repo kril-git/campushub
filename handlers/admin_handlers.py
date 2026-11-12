@@ -14,17 +14,16 @@ from database.admin_crud import get_user_all, set_role, export_users_to_excel, g
 from keyboards.inline_keyboard import create_i_kb_from_dict
 from lexicon.lexicon import LEXICON_ADMIN_TEST
 from services.EnumQuizStatus import QuizStatus
-from services.personal_record_service import get_personal_record_short_lines, get_personal_record_short_lines_render
-from database.dao.personal_record_dao import PersonalRecordDAO
 from database.users_crud import get_user_by_uuid
 from filters.is_admin import IsAdmin
 from keyboards.reply_keyboar import r_kb_cancel
 from models import User
-from services.admin_services import send_users_list_4096, split_into_chunks, send_chunks, split_strings_into_chunks
+from services.admin_services import split_into_chunks, send_chunks, split_strings_into_chunks
 from services.pool_service import PoolService
 from services.quiz_service import QuizService
 from services.render import render_users
 from services.report_service import ReportService
+from services.services import _quiz_status_icon
 from states.admin_states import FSMSetUserToAdmin
 
 router = Router(name=__name__)
@@ -258,17 +257,6 @@ async def on_quizzes_list(callback: CallbackQuery):
     )
 
 
-def _quiz_status_icon(status: QuizStatus) -> str:
-    """Иконка статуса для кнопки."""
-    if status == QuizStatus.ACTIVE:
-        return "🟢"
-    if status == QuizStatus.DRAFT:
-        return "⚪"
-    if status == QuizStatus.FINISHED:
-        return "🔴"
-    return "❓"
-
-
 # ==================== Клик на квиз ====================
 
 @router.callback_query(F.data.startswith("admin:quiz:"))
@@ -289,9 +277,8 @@ async def on_quiz_click(callback: CallbackQuery):
         await callback.answer("Квиз не найден", show_alert=True)
         return
 
-    # Действия по статусу
-    if quiz.status == QuizStatus.DRAFT:
-        # DRAFT → активировать
+    # DRAFT → активировать
+    if quiz.status.is_draft():
         await callback.answer(f"⏳ Активирую квиз {quiz_id}...")
         await QuizService.activate_quiz(quiz_id=quiz_id)
         await callback.message.edit_text(
@@ -303,39 +290,59 @@ async def on_quiz_click(callback: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
                     text="🚀 Запустить рассылку",
-                    callback_data=f"admin:quiz:send:{quiz_id}",
+                    callback_data=f"admin:quiz:{quiz_id}",   # повторный клик — рассылка
                 )],
                 [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
             ]),
         )
+        return
 
-    elif quiz.status == QuizStatus.ACTIVE:
-        # ACTIVE → запустить рассылку
+    # ACTIVE → рассылка
+    if quiz.status.is_active():
         await callback.answer(f"⏳ Запускаю рассылку квиза {quiz_id}...")
-        from services.scheduled_jobs import send_quiz_job
-        await send_quiz_job(quiz_id=quiz_id)
-        await callback.message.edit_text(
-            f"✅ <b>Рассылка квиза {quiz_id} запущена</b>\n\n"
+
+        from services.quiz_broadcast_service import QuizBroadcastService
+        result = await QuizBroadcastService.send_quiz(quiz_id=quiz_id)
+
+        ok = result["ok"]
+        failed = result["failed"]
+        errors = result["errors"]
+
+        mode_text = "🧪 ТЕСТ" if settings.TEST_MODE else "🚀 ПРОД"
+        result_text = (
+            f"✅ <b>Рассылка квиза {quiz_id}</b>\n"
+            f"Режим: {mode_text}\n\n"
             f"Название: {quiz.title}\n"
-            f"Период: {quiz.start_date:%d.%m.%Y}—{quiz.end_date:%d.%m.%Y}",
+            f"Всего: {ok + failed}\n"
+            f"✅ Успешно: {ok}\n"
+            f"❌ Ошибок: {failed}"
+        )
+        if errors:
+            error_lines = "\n".join(
+                f"• {e.get('chat_id', e.get('raw_id', '?'))}: {e.get('reason', '?')}"
+                for e in errors[:5]
+            )
+            result_text += f"\n\n⚠️ Ошибки:\n{error_lines}"
+            if len(errors) > 5:
+                result_text += f"\n... и ещё {len(errors) - 5}"
+
+        await callback.message.edit_text(
+            result_text,
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
+                [InlineKeyboardButton(text="🚪 Выход", callback_data="admin:exit")],
             ]),
         )
+        return
 
-    # elif quiz.status == QuizStatus.FINISHED:
-    #     # FINISHED → показать отчёт
-    #     await callback.answer(f"⏳ Генерирую отчёт...")
-    #     from services.quiz_report_service import QuizReportService
-    #     await QuizReportService.send_report_to_admin(quiz_id=quiz_id)
-    #     await callback.message.edit_text(
-    #         f"✅ <b>Отчёт по квизу {quiz_id} отправлен</b>",
-    #         parse_mode="HTML",
-    #         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-    #             [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
-    #         ]),
-    #     )
+    # FINISHED → заглушка (этап 5)
+    if quiz.status.is_finished():
+        await callback.answer(
+            "📊 Отчёт будет в этапе 5 (пока не реализован)",
+            show_alert=True,
+        )
+        return
 
 
 # ==================== Кнопка «Назад» в меню ====================
@@ -352,9 +359,27 @@ async def on_admin_menu(callback: CallbackQuery):
         [InlineKeyboardButton(text="📝 Квизы", callback_data="admin:quizzes")],
         [InlineKeyboardButton(text="📄 Загрузить квиз", callback_data="load_quiz:start")],
         [InlineKeyboardButton(text="📊 Тест отчёта", callback_data="test_report:28")],
+        [InlineKeyboardButton(text="🚪 Выход", callback_data="admin:exit")],
+
     ])
     await callback.message.edit_text(
         "🔧 <b>Админ-панель</b>",
         reply_markup=keyboard,
         parse_mode="HTML",
     )
+
+
+@router.callback_query(F.data == "admin:exit")
+async def on_admin_exit(callback: CallbackQuery):
+    if str(callback.from_user.id) not in settings.ADMINS:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    await callback.answer("Выход")
+
+    # Удаляем сообщение с меню
+    try:
+        await callback.message.delete()
+    except Exception:
+        # Если не удалось удалить — редактируем
+        await callback.message.edit_text("🚪 Вы вышли из админ-панели.")
