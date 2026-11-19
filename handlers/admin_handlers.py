@@ -259,7 +259,7 @@ async def on_quizzes_list(callback: CallbackQuery):
 
 # ==================== Клик на квиз ====================
 
-@router.callback_query(F.data.startswith("admin:quiz:"))
+@router.callback_query(F.data.regexp(r"^admin:quiz:\d+$"))
 async def on_quiz_click(callback: CallbackQuery):
     if str(callback.from_user.id) not in settings.ADMINS:
         await callback.answer("Нет доступа", show_alert=True)
@@ -299,43 +299,29 @@ async def on_quiz_click(callback: CallbackQuery):
 
     # ACTIVE → рассылка
     if quiz.status.is_active():
-        # Сейчас: клик на ACTIVE сразу запускает рассылку — рискованно для прода.
-        # План: показать диалог «Вы уверены? Получателей: N» с кнопками Да/Отмена.
-        # Пока оставляем как есть (MVP).
+        await callback.answer("⏳ Подготовка...")
 
-        await callback.answer(f"⏳ Запускаю рассылку квиза {quiz_id}...")
-
-        from services.quiz_broadcast_service import QuizBroadcastService
-        result = await QuizBroadcastService.send_quiz(quiz_id=quiz_id)
-
-        ok = result["ok"]
-        failed = result["failed"]
-        errors = result["errors"]
+        # Получаем количество получателей (без рассылки)
+        recipients_count = await _get_recipients_count(quiz_id=quiz_id)
 
         mode_text = "🧪 ТЕСТ" if settings.TEST_MODE else "🚀 ПРОД"
-        result_text = (
-            f"✅ <b>Рассылка квиза {quiz_id}</b>\n"
-            f"Режим: {mode_text}\n\n"
-            f"Название: {quiz.title}\n"
-            f"Всего: {ok + failed}\n"
-            f"✅ Успешно: {ok}\n"
-            f"❌ Ошибок: {failed}"
-        )
-        if errors:
-            error_lines = "\n".join(
-                f"• {e.get('chat_id', e.get('raw_id', '?'))}: {e.get('reason', '?')}"
-                for e in errors[:5]
-            )
-            result_text += f"\n\n⚠️ Ошибки:\n{error_lines}"
-            if len(errors) > 5:
-                result_text += f"\n... и ещё {len(errors) - 5}"
 
         await callback.message.edit_text(
-            result_text,
+            f"🟢 <b>Квиз {quiz_id}: {quiz.title}</b>\n"
+            f"Статус: ACTIVE\n\n"
+            f"Вы уверены, что хотите запустить рассылку?\n\n"
+            f"Режим: {mode_text}\n"
+            f"Получателей: {recipients_count}",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
-                [InlineKeyboardButton(text="🚪 Выход", callback_data="admin:exit")],
+                [InlineKeyboardButton(
+                    text="✅ Да, запустить",
+                    callback_data=f"admin:quiz:confirm_send:{quiz_id}",
+                )],
+                [InlineKeyboardButton(
+                    text="❌ Отмена",
+                    callback_data="admin:quizzes",
+                )],
             ]),
         )
         return
@@ -382,6 +368,56 @@ async def on_admin_menu(callback: CallbackQuery):
     )
 
 
+@router.callback_query(F.data.regexp(r"^admin:quiz:confirm_send:\d+$"))
+async def on_confirm_send(callback: CallbackQuery):
+    """Подтверждение рассылки — запуск."""
+    if str(callback.from_user.id) not in settings.ADMINS:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+
+    _, _, _, quiz_id_str = callback.data.split(":")
+    try:
+        quiz_id = int(quiz_id_str)
+    except ValueError:
+        await callback.answer("Неверный ID", show_alert=True)
+        return
+
+    await callback.answer(f"🚀 Запускаю рассылку квиза {quiz_id}...")
+
+    from services.quiz_broadcast_service import QuizBroadcastService
+    result = await QuizBroadcastService.send_quiz(quiz_id=quiz_id)
+
+    ok = result["ok"]
+    failed = result["failed"]
+    errors = result["errors"]
+
+    mode_text = "🧪 ТЕСТ" if settings.TEST_MODE else "🚀 ПРОД"
+    result_text = (
+        f"✅ <b>Рассылка квиза {quiz_id}</b>\n"
+        f"Режим: {mode_text}\n\n"
+        f"Всего: {ok + failed}\n"
+        f"✅ Успешно: {ok}\n"
+        f"❌ Ошибок: {failed}"
+    )
+    if errors:
+        error_lines = "\n".join(
+            f"• {e.get('chat_id', e.get('raw_id', '?'))}: {e.get('reason', '?')}"
+            for e in errors[:5]
+        )
+        result_text += f"\n\n⚠️ Ошибки:\n{error_lines}"
+        if len(errors) > 5:
+            result_text += f"\n... и ещё {len(errors) - 5}"
+
+    await callback.message.edit_text(
+        result_text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
+            [InlineKeyboardButton(text="🚪 Выход", callback_data="admin:exit")],
+        ]),
+    )
+    return
+
 @router.callback_query(F.data == "admin:exit")
 async def on_admin_exit(callback: CallbackQuery):
     if str(callback.from_user.id) not in settings.ADMINS:
@@ -396,3 +432,18 @@ async def on_admin_exit(callback: CallbackQuery):
     except Exception:
         # Если не удалось удалить — редактируем
         await callback.message.edit_text("🚪 Вы вышли из админ-панели.")
+
+
+async def _get_recipients_count(quiz_id: int) -> int:
+    """Количество получателей для квиза (без рассылки)."""
+    from services.quiz_service import QuizService
+    from services.recipients_services import RecipientsService
+
+    if settings.TEST_MODE:
+        base = list(settings.TEST_USERS)
+    else:
+        base = await RecipientsService.get_all_telegram_ids()
+
+    completed = await QuizService.get_completed_user_uuids(quiz_id=quiz_id)
+    recipients = [u for u in base if str(u) not in completed]
+    return len(recipients)

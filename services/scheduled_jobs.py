@@ -15,6 +15,7 @@ from database.dao.pool_dao import DAOPools, PoolDAO
 from keyboards.inline_keyboard import create_i_kb_from_dict, generate_inline_keyboard_for_question
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
+from services.quiz_broadcast_service import QuizBroadcastService
 from services.quiz_service import QuizService
 from services.recipients_services import RecipientsService
 from services.report_service import ReportService
@@ -252,6 +253,29 @@ async def update_quizzes_status_job() -> None:
     )
 
 
+async def send_quizzes_job() -> None:
+    """
+    Cron 10:00: рассылка активного квиза + уведомления бросившим.
+    """
+    logger.info("🔔 send_quizzes_job start")
+
+    # 1. Рассылка по ACTIVE квизу (2 группы: не начинал, бросил)
+    try:
+        result = await QuizBroadcastService.send_all_active()
+        logger.info("send_quizzes_job: send_all_active=%s", result)
+    except Exception as e:
+        logger.exception("send_quizzes_job: ошибка send_all_active: %s", e)
+
+    # 2. Уведомления бросившим (закрытые вчера)
+    try:
+        result = await QuizBroadcastService.notify_abandoned()
+        logger.info("send_quizzes_job: notify_abandoned=%s", result)
+    except Exception as e:
+        logger.exception("send_quizzes_job: ошибка notify_abandoned: %s", e)
+
+    logger.info("🔔 send_quizzes_job done")
+
+
 def register_jobs(scheduler: AsyncIOScheduler) -> None:
     now_in_minsk = datetime.now(ZoneInfo("Europe/Minsk"))
     """Регистрация всех периодических задач. Вызывать один раз при старте."""
@@ -318,3 +342,29 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
     #                       "text": "Проверка выполнения задания по рассписани, сообщение только админам",
     #                   },
     #                   )
+
+    # ==================== Квизы ====================
+
+    # 0:10 — актуализация статусов (DRAFT → ACTIVE, ACTIVE → FINISHED)
+    scheduler.add_job(
+        update_quizzes_status_job,
+        trigger=CronTrigger(hour=0, minute=10, timezone=ZoneInfo("Europe/Minsk")),
+        id="update_quizzes_status_job",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+        max_instances=1,
+    )
+    logger.info("✅ update_quizzes_status_job зарегистрирован (cron 0:10 Europe/Minsk)")
+
+    # 10:00 — рассылка ACTIVE + уведомления бросившим
+    scheduler.add_job(
+        send_quizzes_job,
+        trigger=CronTrigger(hour=10, minute=0, timezone=ZoneInfo("Europe/Minsk")),
+        id="send_quizzes_job",
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+        max_instances=1,
+    )
+    logger.info("✅ send_quizzes_job зарегистрирован (cron 10:00 Europe/Minsk)")

@@ -40,22 +40,32 @@ class QuizScene(Scene, state="quiz"):
         user_uuid = str(callback.from_user.id)
 
         # Сохраняем в state
-        await state.update_data(quiz_id=quiz_id, user_uuid=user_uuid)
+        await state.update_data(quiz_id=quiz_id, user_uuid=user_uuid, current_number=1)
 
-        # Проверяем, не завершён ли уже
+        # Проверяем прогресс
         quiz_user = await QuizService.get_user(
             user_uuid=user_uuid, quiz_id=quiz_id,
         )
+
         if quiz_user and quiz_user.end_quiz:
-            await callback.message.answer(
-                "✅ Вы уже прошли этот квиз.\n"
-                f"Ваш результат: {quiz_user.correct_count} из {quiz_user.total_count}."
-            )
+            # 1. Прошёл
+            if quiz_user.completed_at is not None:
+                await callback.message.answer(
+                    f"✅ Вы уже прошли этот квиз.\n"
+                    f"Ваш результат: {quiz_user.correct_count} из {quiz_user.total_count}."
+                )
+            # 2. Бросил (квиз закрыт)
+            else:
+                await callback.message.answer(
+                    "⏰ Квиз закрыт.\n"
+                    "Вы не завершили прохождение — ответы обнулены.\n\n"
+                    "Дождитесь следующего квиза."
+                )
             await state.clear()
             await self.wizard.exit()
             return
 
-        # Показываем первый вопрос (или продолжаем)
+        # 3. Продолжаем или начинаем
         await self._show_next_question(callback.message, state)
 
     # ==================== Ответ ====================

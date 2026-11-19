@@ -626,3 +626,14 @@ class QuizService:
         return await QuizResponseDAO.get_with_question_answer_by_quiz(
             session=session, quiz_id=quiz_id,
         )
+
+    @staticmethod
+    @readonly
+    async def get_abandoned_after_date(
+            session,
+            after_date: date,
+    ) -> list[QuizUser]:
+        """QuizUser, бросившие и обновлённые после after_date."""
+        return await QuizUserDAO.get_abandoned_after_date(
+            session=session, after_date=after_date,
+        )

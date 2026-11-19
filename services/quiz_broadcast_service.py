@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -199,3 +199,69 @@ class QuizBroadcastService:
             result_new["ok"], result_continue["ok"],
         )
         return {"ok": total_ok, "failed": total_failed, "errors": total_errors}
+
+    @staticmethod
+    async def notify_abandoned() -> dict:
+        """Уведомляет бросивших о закрытии квиза (за вчера)."""
+        logger.info("QuizBroadcastService.notify_abandoned: start")
+        now = date.today()
+        yesterday = now - timedelta(days=1)
+
+        abandoned = await QuizService.get_abandoned_after_date(
+            after_date=yesterday,
+        )
+
+        if not abandoned:
+            logger.info("notify_abandoned: нет бросивших за вчера")
+            return {"ok": 0, "failed": 0, "errors": []}
+
+        # Фильтр по TEST_MODE
+        if settings.TEST_MODE:
+            test_set = {str(u) for u in settings.TEST_USERS}
+            abandoned = [u for u in abandoned if str(u.user_uuid) in test_set]
+            logger.info(
+                "notify_abandoned: TEST_MODE=True → после фильтра %d",
+                len(abandoned),
+            )
+
+        if not abandoned:
+            logger.info("notify_abandoned: после фильтра — пусто")
+            return {"ok": 0, "failed": 0, "errors": []}
+
+        logger.info("notify_abandoned: найдено %d бросивших", len(abandoned))
+
+        ok = failed = 0
+        errors = []
+
+        for quiz_user in abandoned:
+            try:
+                quiz = await QuizService.get_quiz(quiz_id=quiz_user.quiz_id)
+                quiz_title = quiz.title if quiz else "Квиз"
+
+                await bot.send_message(
+                    chat_id=quiz_user.user_uuid,
+                    text=(
+                        f"⏰ <b>Квиз «{quiz_title}» закрыт</b>\n\n"
+                        f"Вы не завершили прохождение — ответы обнулены.\n\n"
+                        f"Дождитесь следующего квиза."
+                    ),
+                    parse_mode="HTML",
+                )
+                ok += 1
+            except Exception as e:
+                logger.warning(
+                    "Не удалось уведомить %s: %s",
+                    quiz_user.user_uuid, e,
+                )
+                failed += 1
+                errors.append({
+                    "chat_id": quiz_user.user_uuid,
+                    "reason": "notify_failed",
+                    "error": str(e),
+                })
+
+        logger.info(
+            "notify_abandoned: ok=%d, failed=%d",
+            ok, failed,
+        )
+        return {"ok": ok, "failed": failed, "errors": errors}

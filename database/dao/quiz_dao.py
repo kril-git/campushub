@@ -445,3 +445,24 @@ class QuizUserDAO(BaseDAO[QuizUser]):
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @classmethod
+    async def get_abandoned_after_date(
+            cls,
+            session: AsyncSession,
+            after_date: date,
+    ) -> list[QuizUser]:
+        """
+        QuizUser, которые бросили (end_quiz=True, completed_at IS NULL)
+        и были обновлены после after_date (закрыты вчера).
+        """
+        stmt = (
+            select(cls.model)
+            .where(
+                cls.model.end_quiz.is_(True),
+                cls.model.completed_at.is_(None),  # бросил
+                cls.model.date_update >= after_date,
+            )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
