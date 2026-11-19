@@ -299,6 +299,10 @@ async def on_quiz_click(callback: CallbackQuery):
 
     # ACTIVE → рассылка
     if quiz.status.is_active():
+        # Сейчас: клик на ACTIVE сразу запускает рассылку — рискованно для прода.
+        # План: показать диалог «Вы уверены? Получателей: N» с кнопками Да/Отмена.
+        # Пока оставляем как есть (MVP).
+
         await callback.answer(f"⏳ Запускаю рассылку квиза {quiz_id}...")
 
         from services.quiz_broadcast_service import QuizBroadcastService
@@ -338,9 +342,18 @@ async def on_quiz_click(callback: CallbackQuery):
 
     # FINISHED → заглушка (этап 5)
     if quiz.status.is_finished():
-        await callback.answer(
-            "📊 Отчёт будет в этапе 5 (пока не реализован)",
-            show_alert=True,
+        await callback.answer("⏳ Генерирую отчёт...")
+
+        from services.quiz_report_service import QuizReportService
+        await QuizReportService.send_report_to_admin(quiz_id=quiz_id)
+
+        await callback.message.edit_text(
+            f"✅ <b>Отчёт по квизу {quiz_id} отправлен</b>",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:quizzes")],
+                [InlineKeyboardButton(text="🚪 Выход", callback_data="admin:exit")],
+            ]),
         )
         return
 

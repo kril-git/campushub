@@ -144,6 +144,50 @@ class QuizDAO(BaseDAO[Quiz]):
         result = await session.execute(stmt)
         return result.scalars().first()
 
+    @classmethod
+    async def get_drafts_starting_today(
+            cls,
+            session: AsyncSession,
+            now: date | None = None,
+    ) -> list[Quiz]:
+        """
+        DRAFT-квизы, у которых start_date == today.
+        Для cron 0:10 (активация).
+        """
+        if now is None:
+            now = date.today()
+        stmt = (
+            select(cls.model)
+            .where(
+                cls.model.status == QuizStatus.DRAFT,
+                cls.model.start_date == now,
+            )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def get_active_ended_yesterday(
+            cls,
+            session: AsyncSession,
+            now: date | None = None,
+    ) -> list[Quiz]:
+        """
+        ACTIVE-квизы, у которых end_date < today (просрочены).
+        Для cron 0:10 (закрытие).
+        """
+        if now is None:
+            now = date.today()
+        stmt = (
+            select(cls.model)
+            .where(
+                cls.model.status == QuizStatus.ACTIVE,
+                cls.model.end_date < now,
+            )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
 
 # ==================== QuizQuestionDAO ====================
 
@@ -294,6 +338,32 @@ class QuizResponseDAO(BaseDAO[QuizResponse]):
         )
         return (await session.scalar(stmt)) or 0
 
+    @classmethod
+    async def get_with_question_answer_by_quiz(
+            cls, session, quiz_id: int,
+    ) -> list[dict]:
+        """Все ответы по квизу (JOIN с вопросами и ответами)."""
+        from models import QuizQuestion, QuizAnswer
+
+        stmt = (
+            select(
+                cls.model.user_uuid.label("uuid"),
+                cls.model.step,
+                cls.model.is_correct,
+                QuizQuestion.number.label("question_number"),
+                QuizQuestion.text.label("question_text"),
+                QuizAnswer.text.label("answer_text"),
+                QuizAnswer.is_correct.label("answer_is_correct"),
+                cls.model.date_create,
+            )
+            .join(QuizQuestion, QuizQuestion.id == cls.model.question_id)
+            .join(QuizAnswer, QuizAnswer.id == cls.model.answer_id)
+            .where(cls.model.quiz_id == quiz_id)
+            .order_by(cls.model.user_uuid, cls.model.step)
+        )
+        result = await session.execute(stmt)
+        return [dict(row._mapping) for row in result.all()]
+
 
 # ==================== QuizUserDAO ====================
 
@@ -342,6 +412,36 @@ class QuizUserDAO(BaseDAO[QuizUser]):
                 cls.model.end_quiz.is_(False),
                 Quiz.end_date < before_date,
             )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def get_abandoned_by_quiz(
+            cls,
+            session: AsyncSession,
+            quiz_id: int,
+    ) -> list[QuizUser]:
+        """
+        QuizUser с end_quiz=False для квиза (бросившие).
+        Для finish_quiz (пометить бросивших).
+        """
+        stmt = (
+            select(cls.model)
+            .where(
+                cls.model.quiz_id == quiz_id,
+                cls.model.end_quiz.is_(False),
+            )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @classmethod
+    async def get_by_quiz(cls, session, quiz_id: int) -> list[QuizUser]:
+        """Все QuizUser по квизу."""
+        stmt = (
+            select(cls.model)
+            .where(cls.model.quiz_id == quiz_id)
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())

@@ -1,6 +1,5 @@
-# services/scheduled_jobs.py
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot
@@ -16,6 +15,7 @@ from database.dao.pool_dao import DAOPools, PoolDAO
 from keyboards.inline_keyboard import create_i_kb_from_dict, generate_inline_keyboard_for_question
 from services.EnumPools import PoolCategory
 from services.pool_service import PoolService
+from services.quiz_service import QuizService
 from services.recipients_services import RecipientsService
 from services.report_service import ReportService
 from services.scheduled_broadcast_service import ScheduledBroadcastService
@@ -25,93 +25,6 @@ from utils.cleanup_old_survey_messages import cleanup_old_survey_messages
 
 logger = logging.getLogger(__name__)
 
-
-# async def daily_pool_job(test_users: list[int] | None = None) -> None:
-#     """
-#     Ежедневная задача 09:00 по Минску.
-#
-#     test_users=None  → боевой режим, рассылка всем пользователям
-#     test_users=[...] → тестовый режим, только этим ID
-#     """
-#     # tz = AppDependencies.tz
-#     # today = datetime.now(tz).date()
-#     logger.info("🔔 daily_pool_job start")
-#
-#     #     Получаем активный пул если существует
-#     # active_pool = await DAOPools.get_pool_action(pool_category=PoolCategory.NONE)
-#     active_pool = await PoolDAO.get_id_action(pool_category=PoolCategory.NONE)
-#     if active_pool is None:
-#         logger.info("Нет опроса на сегодня — выходим")
-#         return
-#
-
-
-# if active_pool.end_date <= datetime.now().date():
-#     await DAOPools.update_pool_actions(pool_id=active_pool.pool_uuid)
-
-
-#     # 1) Закрыть просроченные опросы
-#     async with db_helper.session_factory() as session:
-#         await close_expired_polls(session, today)
-#
-#     # 2) Найти опрос, стартующий сегодня
-#     async with db_helper.session_factory() as session:
-#         poll = await get_poll_starting_today(session, today)
-#
-#     if poll is None:
-#         logger.info("Нет опроса на сегодня — выходим")
-#         return
-#
-#     # 3) Получатели
-#     if test_users is not None:
-#         recipients = test_users
-#     else:
-#         async with db_helper.session_factory() as session:
-#             recipients = await get_all_user_ids(session)
-#
-#     logger.info("Рассылаем опрос %s → %d получателей", poll.id, len(recipients))
-#
-#     # 4) Рассылка
-#     for user_id in recipients:
-#         await send_message_text_to_user(
-#             uuid=str(user_id),
-#             text=poll.text,
-#         )
-#
-#
-# async def close_expired_polls(session, today: date) -> None:
-#     """Закрывает опросы, у которых end_date < today и is_active=True."""
-#     # пример на SQLAlchemy 2.0 — подгоните под свою модель
-#     from sqlalchemy import update
-#     from database.models import Poll  # ваш модуль
-#
-#     stmt = (
-#         update(Poll)
-#         .where(Poll.is_active == True, Poll.end_date < today)
-#         .values(is_active=False)
-#     )
-#     result = await session.execute(stmt)
-#     await session.commit()
-#     logger.info("Закрыто просроченных опросов: %d", result.rowcount)
-#
-#
-# async def get_poll_starting_today(session, today: date):
-#     from sqlalchemy import select
-#     from database.models import Poll
-#
-#     stmt = select(Poll).where(
-#         Poll.is_active == True,
-#         Poll.start_date == today,
-#     ).limit(1)
-#     return (await session.execute(stmt)).scalar_one_or_none()
-#
-#
-# async def get_all_user_ids(session) -> list[int]:
-#     from sqlalchemy import select
-#     from database.models import User
-#
-#     stmt = select(User.id)  # или User.telegram_id — что у вас
-#     return [row[0] for row in (await session.execute(stmt)).all()]
 
 async def daily_send_pool_job(uuid: list[str] | None = None, text: str = "") -> None:
     """
@@ -306,6 +219,37 @@ async def mark_as_deleted_pool_job() -> None:
             uuid=settings.MAIN_ADMIN,
             text=f"❌ Ошибка генерации отчёта по пулу {active_pool_id}: {e}",
         )
+
+
+async def update_quizzes_status_job() -> None:
+    """
+    Cron 0:10: актуализация статусов квизов.
+
+    1. DRAFT с start_date == today → ACTIVE.
+    2. ACTIVE с end_date < today → FINISHED + пометить бросивших.
+    """
+    logger.info("🔔 update_quizzes_status_job start")
+    now = date.today()
+
+    # 1. Активация DRAFT с start_date == today
+    drafts = await QuizService.get_drafts_starting_today(now=now)
+    for draft in drafts:
+        await QuizService.activate_quiz(quiz_id=draft.id)
+        logger.info("update_quizzes_status_job: активирован квиз id=%s", draft.id)
+
+    # 2. Закрытие ACTIVE с end_date < today
+    ended = await QuizService.get_active_ended_yesterday(now=now)
+    for quiz in ended:
+        abandoned_count = await QuizService.finish_quiz(quiz_id=quiz.id)
+        logger.info(
+            "update_quizzes_status_job: закрыт квиз id=%s (бросивших=%d)",
+            quiz.id, abandoned_count,
+        )
+
+    logger.info(
+        "update_quizzes_status_job: активировано=%d, закрыто=%d",
+        len(drafts), len(ended),
+    )
 
 
 def register_jobs(scheduler: AsyncIOScheduler) -> None:

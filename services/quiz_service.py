@@ -218,6 +218,80 @@ class QuizService:
 
         return errors
 
+    @staticmethod
+    @readonly
+    async def get_drafts_starting_today(
+            session,
+            now: date | None = None,
+    ) -> list[Quiz]:
+        """
+        DRAFT-квизы, у которых start_date == today.
+        Для cron 0:10 (активация).
+        """
+        if now is None:
+            now = date.today()
+        return await QuizDAO.get_drafts_starting_today(session=session, now=now)
+
+    @staticmethod
+    @readonly
+    async def get_active_ended_yesterday(
+            session,
+            now: date | None = None,
+    ) -> list[Quiz]:
+        """
+        ACTIVE-квизы, у которых end_date < today (просрочены).
+        Для cron 0:10 (закрытие).
+        """
+        if now is None:
+            now = date.today()
+        return await QuizDAO.get_active_ended_yesterday(session=session, now=now)
+
+    @staticmethod
+    @readonly
+    async def get_abandoned_by_quiz(
+            session,
+            quiz_id: int,
+    ) -> list[QuizUser]:
+        """
+        QuizUser с end_quiz=False для квиза (бросившие).
+        Для finish_quiz (пометить бросивших).
+        """
+        return await QuizUserDAO.get_abandoned_by_quiz(
+            session=session, quiz_id=quiz_id,
+        )
+
+    @staticmethod
+    @connection
+    async def finish_quiz(session, quiz_id: int) -> int:
+        """
+        Закрыть квиз (ACTIVE → FINISHED) + пометить бросивших.
+
+        Возвращает:
+        - int — сколько бросивших помечено.
+        """
+        # 1. Закрыть квиз
+        await QuizDAO.set_status(
+            session=session, quiz_id=quiz_id, status=QuizStatus.FINISHED,
+        )
+        logger.info("QuizService.finish_quiz: quiz_id=%s → FINISHED", quiz_id)
+
+        # 2. Найти бросивших (end_quiz=False)
+        abandoned = await QuizUserDAO.get_abandoned_by_quiz(
+            session=session, quiz_id=quiz_id,
+        )
+
+        # 3. Пометить их: end_quiz=True, completed_at=None (бросил)
+        for quiz_user in abandoned:
+            quiz_user.end_quiz = True
+            quiz_user.completed_at = None  # ← бросил
+            # date_update обновится автоматически (onupdate=func.now())
+
+        logger.info(
+            "QuizService.finish_quiz: quiz_id=%s, помечено бросивших=%d",
+            quiz_id, len(abandoned),
+        )
+        return len(abandoned)
+
     # ==================== Загрузка ====================
 
     @staticmethod
@@ -418,6 +492,14 @@ class QuizService:
             session=session, quiz_id=quiz_id,
         )
 
+    @staticmethod
+    @readonly
+    async def get_all_active(session, now=None) -> list[Quiz]:
+        """Все активные квизы на сейчас."""
+        if now is None:
+            now = date.today()
+        return await QuizDAO.get_all_active(session=session, now=now)
+
     # ==================== Чтение (для будущего) ====================
 
     @staticmethod
@@ -518,3 +600,29 @@ class QuizService:
             "correct_text": correct_answer.text if correct_answer else None,
             "comment": comment,
         }
+
+    @staticmethod
+    @readonly
+    async def get_users_data(session, quiz_id: int) -> list[dict]:
+        """Все QuizUser по квизу (dict)."""
+        users = await QuizUserDAO.get_by_quiz(session=session, quiz_id=quiz_id)
+        return [
+            {
+                "user_uuid": u.user_uuid,
+                "end_quiz": u.end_quiz,
+                "step": u.step,
+                "correct_count": u.correct_count,
+                "total_count": u.total_count,
+                "completed_at": u.completed_at,
+                "last_activity_at": u.last_activity_at,
+            }
+            for u in users
+        ]
+
+    @staticmethod
+    @readonly
+    async def get_answers_data(session, quiz_id: int) -> list[dict]:
+        """Все ответы по квизу (JOIN)."""
+        return await QuizResponseDAO.get_with_question_answer_by_quiz(
+            session=session, quiz_id=quiz_id,
+        )
