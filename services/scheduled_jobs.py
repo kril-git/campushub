@@ -254,24 +254,58 @@ async def update_quizzes_status_job() -> None:
 
 
 async def send_quizzes_job() -> None:
-    """
-    Cron 10:00: рассылка активного квиза + уведомления бросившим.
-    """
+    """Cron 10:00: рассылка активного квиза + уведомления бросившим."""
     logger.info("🔔 send_quizzes_job start")
 
-    # 1. Рассылка по ACTIVE квизу (2 группы: не начинал, бросил)
+    # 1. Рассылка по ACTIVE
+    result_send = {"ok": 0, "failed": 0, "errors": []}
     try:
-        result = await QuizBroadcastService.send_all_active()
-        logger.info("send_quizzes_job: send_all_active=%s", result)
+        result_send = await QuizBroadcastService.send_all_active()
+        logger.info("send_quizzes_job: send_all_active=%s", result_send)
     except Exception as e:
         logger.exception("send_quizzes_job: ошибка send_all_active: %s", e)
 
-    # 2. Уведомления бросившим (закрытые вчера)
+    # 2. Уведомления бросившим
+    result_notify = {"ok": 0, "failed": 0, "errors": []}
     try:
-        result = await QuizBroadcastService.notify_abandoned()
-        logger.info("send_quizzes_job: notify_abandoned=%s", result)
+        result_notify = await QuizBroadcastService.notify_abandoned()
+        logger.info("send_quizzes_job: notify_abandoned=%s", result_notify)
     except Exception as e:
         logger.exception("send_quizzes_job: ошибка notify_abandoned: %s", e)
+
+    # 3. Уведомление админу
+    mode_text = "🧪 ТЕСТ" if settings.TEST_MODE else "🚀 ПРОД"
+    total_ok = result_send["ok"] + result_notify["ok"]
+    total_failed = result_send["failed"] + result_notify["failed"]
+
+    admin_text = (
+        f"📤 <b>send_quizzes_job завершён</b>\n"
+        f"Режим: {mode_text}\n\n"
+        f"✅ Рассылка: ok={result_send['ok']}, failed={result_send['failed']}\n"
+        f"✅ Уведомления: ok={result_notify['ok']}, failed={result_notify['failed']}\n"
+        f"Итого: ok={total_ok}, failed={total_failed}"
+    )
+
+    # Ошибки (первые 10)
+    all_errors = result_send["errors"] + result_notify["errors"]
+    if all_errors:
+        error_lines = "\n".join(
+            f"• {e.get('chat_id', e.get('raw_id', '?'))}: {e.get('reason', '?')}"
+            for e in all_errors[:10]
+        )
+        admin_text += f"\n\n⚠️ <b>Ошибки:</b>\n{error_lines}"
+        if len(all_errors) > 10:
+            admin_text += f"\n... и ещё {len(all_errors) - 10}"
+
+    try:
+        await bot.send_message(
+            chat_id=settings.MAIN_ADMIN,
+            text=admin_text,
+            parse_mode="HTML",
+        )
+        logger.info("send_quizzes_job: уведомление админу отправлено")
+    except Exception as e:
+        logger.exception("send_quizzes_job: ошибка уведомления админу: %s", e)
 
     logger.info("🔔 send_quizzes_job done")
 
@@ -368,3 +402,17 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         max_instances=1,
     )
     logger.info("✅ send_quizzes_job зарегистрирован (cron 10:00 Europe/Minsk)")
+
+    run_at = datetime.now(ZoneInfo("Europe/Minsk")) + timedelta(minutes=2)
+    scheduler.add_job(
+        send_quizzes_job,
+        trigger="date",
+        run_date=run_at,
+        id="send_quizzes_job_test",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+    logger.warning(
+        "🧪 ТЕСТ: send_quizzes_job запланирован на %s (через 2 минуты)",
+        run_at.strftime("%H:%M:%S"),
+    )

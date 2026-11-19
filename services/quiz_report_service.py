@@ -26,7 +26,8 @@ class QuizReportService:
         if not quiz:
             raise ValueError(f"Квиз {quiz_id} не найден")
 
-        max_q = len(quiz.questions)
+        max_q = await QuizService.count_questions(quiz_id=quiz_id)  # ← через сервис
+
         if max_q == 0:
             raise ValueError(f"У квиза {quiz_id} нет вопросов")
 

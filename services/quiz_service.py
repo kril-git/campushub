@@ -637,3 +637,9 @@ class QuizService:
         return await QuizUserDAO.get_abandoned_after_date(
             session=session, after_date=after_date,
         )
+
+    @staticmethod
+    @readonly
+    async def count_questions(session, quiz_id: int) -> int:
+        """Количество вопросов в квизе."""
+        return await QuizQuestionDAO.count_by_quiz(session=session, quiz_id=quiz_id)

@@ -73,11 +73,13 @@ class QuizBroadcastService:
         ])
 
         # 4. Текст
+        questions_count = await QuizService.count_questions(quiz_id=quiz.id)  # ← добавить
+
         text = (
             f"<b>📝 {quiz.title}</b>\n\n"
             f"{quiz.description or ''}\n\n"
             f"Период: {quiz.start_date:%d.%m.%Y} — {quiz.end_date:%d.%m.%Y}\n"
-            f"Вопросов: {len(quiz.questions)}"
+            f"Вопросов: {questions_count}"
         )
 
         # 5. Рассылка
@@ -263,5 +265,61 @@ class QuizBroadcastService:
         logger.info(
             "notify_abandoned: ok=%d, failed=%d",
             ok, failed,
+        )
+        return {"ok": ok, "failed": failed, "errors": errors}
+
+    @staticmethod
+    async def _send_new_quiz(quiz, recipients: list[str]) -> dict:
+        """Группа 1: «Новый квиз» с кнопками."""
+        questions_count = await QuizService.count_questions(quiz_id=quiz.id)  # ← добавить
+
+        kbd = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✅ Начать / Продолжить",
+                callback_data=f"quiz:start:{quiz.id}",
+            )],
+            [InlineKeyboardButton(
+                text="❌ Не сейчас",
+                callback_data=f"quiz:decline:{quiz.id}",
+            )],
+        ])
+        text = (
+            f"<b>📝 Новый квиз «{quiz.title}»</b>\n\n"
+            f"{quiz.description or ''}\n\n"
+            f"Период: {quiz.start_date:%d.%m.%Y} — {quiz.end_date:%d.%m.%Y}\n"
+            f"Вопросов: {questions_count}"
+        )
+        ok, failed, errors = await broadcast_text_all_users(
+            bot=bot,
+            recipients=recipients,
+            text=text,
+            reply_markup=kbd,
+            save_last_message=True,
+        )
+        return {"ok": ok, "failed": failed, "errors": errors}
+
+    @staticmethod
+    async def _send_continue_quiz(quiz, recipients: list[str]) -> dict:
+        """Группа 2: «Продолжить N из M» с кнопками."""
+        kbd = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✅ Продолжить",
+                callback_data=f"quiz:start:{quiz.id}",
+            )],
+            [InlineKeyboardButton(
+                text="❌ Не сейчас",
+                callback_data=f"quiz:decline:{quiz.id}",
+            )],
+        ])
+        text = (
+            f"<b>⏰ Вы не завершили квиз «{quiz.title}»</b>\n\n"
+            f"Продолжите с места остановки — ответы сохранены."
+        )
+        ok, failed, errors = await broadcast_text_all_users(
+            bot=bot,
+            recipients=recipients,
+            text=text,
+            reply_markup=kbd,
+            save_last_message=True,
         )
         return {"ok": ok, "failed": failed, "errors": errors}
