@@ -16,6 +16,7 @@ import logging
 
 from database.db_helper import DatabaseHelper, db_helper
 from services.scheduled_jobs import register_jobs
+
 # from services.sending_service import send_message_text_to_user, send_message_io_and_mio_moglie
 
 logger = logging.getLogger(__name__)
@@ -75,10 +76,16 @@ class AppDependencies:
             cls.use_tunnel = False
 
         # Redis клиент
-        cls.redis_client = await Redis.from_url(url=
-                                                f"redis://{settings.get_redis_url}:{str(settings.REDIS_PORT)}",
-                                                decode_responses=True
-                                                )
+        if settings.TEST_MODE:
+            cls.redis_client = await Redis.from_url(url=
+                                                    f"redis://{settings.get_redis_url}:{str(settings.REDIS_PORT)}/1",
+                                                    decode_responses=True
+                                                    )
+        else:
+            cls.redis_client = await Redis.from_url(url=
+                                                    f"redis://{settings.get_redis_url}:{str(settings.REDIS_PORT)}",
+                                                    decode_responses=True
+                                                    )
 
         # 3. Storage (делегируем в AppStorage)
         AppStorage.setup(cls.redis_client)
